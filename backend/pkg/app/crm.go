@@ -56,6 +56,14 @@ func crmFailure(w http.ResponseWriter, op string, err error) {
 		errResp(w, http.StatusConflict, "a pipeline must keep at least one open stage")
 	case errors.Is(err, store.ErrLastPipeline):
 		errResp(w, http.StatusConflict, "a workspace must keep at least one pipeline")
+	case errors.Is(err, store.ErrActivityNotFound):
+		errResp(w, http.StatusNotFound, "activity not found")
+	case errors.Is(err, store.ErrActivityNeedsLink):
+		errResp(w, http.StatusBadRequest, "an activity links to at least one contact, company, or deal")
+	case errors.Is(err, store.ErrNotATask):
+		errResp(w, http.StatusBadRequest, "only a task has a due time, an assignee, or a completed state")
+	case errors.Is(err, store.ErrActivityForbidden):
+		errResp(w, http.StatusForbidden, "only the author or an owner or admin may change this activity")
 	case errors.Is(err, store.ErrStageOrderMismatch):
 		errResp(w, http.StatusConflict, "stage_ids must list every stage of the pipeline exactly once")
 	default:

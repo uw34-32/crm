@@ -228,6 +228,15 @@ func (a *App) Handler() http.Handler {
 				r.Delete("/{"+dealParam+"}", a.deleteDeal)
 				r.Post("/{"+dealParam+"}/move", a.moveDeal)
 			})
+			r.Route("/activities", func(r chi.Router) {
+				r.Get("/", a.listActivities)
+				r.Post("/", a.createActivity)
+				r.Get("/{"+activityParam+"}", a.getActivity)
+				r.Patch("/{"+activityParam+"}", a.updateActivity)
+				r.Delete("/{"+activityParam+"}", a.deleteActivity)
+				r.Post("/{"+activityParam+"}/complete", a.setActivityCompleted(true))
+				r.Post("/{"+activityParam+"}/reopen", a.setActivityCompleted(false))
+			})
 		})
 	})
 

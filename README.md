@@ -117,6 +117,13 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `PATCH /workspaces/{id}/deals/{dealID}` | Any of `title`, `value_minor`, `currency`, `expected_close_date`, `company_id`, `contact_id`, `owner_id` | 200 with the deal | `null` clears the date or a reference |
 | `POST /workspaces/{id}/deals/{dealID}/move` | `stage_id`, optional `position`, `lost_reason` | 200 with the deal | See [Moving a deal](#moving-a-deal) |
 | `DELETE /workspaces/{id}/deals/{dealID}` | | 204 | A soft delete; closes the gap on the board |
+| `GET /workspaces/{id}/activities` | | 200 with a page of activities | Newest first. Filters: `contact_id`, `company_id`, `deal_id`, `assignee_id`, `kind`, `status`, `due_before`, `due_after` |
+| `POST /workspaces/{id}/activities` | `kind`, `subject`, and at least one of `contact_id`, `company_id`, `deal_id`; optional `body`, and for a task `due_at` and `assignee_id` | 201 with the activity | The caller is the author |
+| `GET /workspaces/{id}/activities/{activityID}` | | 200 with the activity | |
+| `PATCH /workspaces/{id}/activities/{activityID}` | Any of `subject`, `body`, `due_at`, `assignee_id`, `contact_id`, `company_id`, `deal_id` | 200 with the activity | The author, an owner, or an admin; others get a 403 |
+| `POST /workspaces/{id}/activities/{activityID}/complete` | | 200 with the task | Any member; completing again keeps the first time. A 400 for anything but a task |
+| `POST /workspaces/{id}/activities/{activityID}/reopen` | | 200 with the task | Any member. A 400 for anything but a task |
+| `DELETE /workspaces/{id}/activities/{activityID}` | | 204 | A soft delete. The author, an owner, or an admin |
 
 Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin`, and `member`.
 
@@ -189,7 +196,27 @@ A move puts a deal at a position in a stage of its own pipeline, and every membe
 
 Every write to one pipeline's structure and positions first takes that pipeline's row lock, so concurrent moves run one at a time, and each reads the board the last one left. No two deals can share a position, and no move works from a stale board. A deferrable unique constraint backs this up, refusing a duplicate at the end of a statement. An edit needs no lock, because it writes only the fields it names, and it cannot undo a move or be undone by one. Moves of one deal do not detect each other: the last to run wins. One pipeline's moves are serial, which is fine for the size of team this serves, and different pipelines do not wait for each other.
 
-Writers take locks in one order, which keeps them from deadlocking: the workspace row, then the rows a deal links to (company, contact, member), then the pipeline, then deals.
+Writers take locks in one order, which keeps them from deadlocking: the workspace row, then the rows a deal or activity links to (company, contact, member), then the pipeline, then deals, then activities, several of them in ID order.
+
+### Activities
+
+An activity is a `note`, `call`, `meeting`, or `task` about a contact, a company, or a deal of the workspace. It links to at most one of each and to at least one, so a deal's, contact's, or company's timeline is a filtered list. Lists are newest first, by `created_at` and then `id`, which keeps paging stable; `q` matches the subject and body.
+
+| Field | Limit |
+| --- | --- |
+| `kind` | Required on create; it never changes, so a `PATCH` that sends it gets a 400 |
+| `subject` | Required; 200 characters |
+| `body` | 10000 characters; empty by default |
+| `due_at` | A task only. RFC 3339 with a zone, such as `2027-03-14T09:30:00Z`, from 1900 to 2200 in UTC |
+| `assignee_id` | A task only. A current member of the workspace |
+| `completed_at` | A task only, and only through `complete` and `reopen`; a body that sends it gets a 400 |
+| `author_id` | The member who created the activity; a body that sends it gets a 400 |
+
+Only a task has a due time, an assignee, and a completed state: a note, call, or meeting records something that already happened, at `created_at`. The schema holds the same rule. `status=open` lists tasks not yet completed and `status=completed` the completed ones; `due_before` is exclusive and `due_after` inclusive, and both match tasks only. A malformed filter gets a 400.
+
+Every member reads and creates activities and completes or reopens tasks, because a task is shared work. Only the author, an owner, or an admin edits or deletes one, so nobody rewrites a colleague's notes; the role is re-read inside the transaction. Links and the assignee follow the rules for a deal's links: anything out of reach gets the same 404 with an identical body, and a write that links one holds a share lock on it. Invalid UTF-8 and NUL characters get a 400. A `PATCH` that sets `subject` or `body` to `null` gets a 400, `null` on `due_at`, `assignee_id`, or a link clears it, and clearing the last link gets a 400. On a create, `null` counts as left out.
+
+Deleting a contact, company, or deal clears that link on its activities in the same transaction, moving `updated_at`. An activity left with no link at all is soft-deleted in the same statement, since nobody could reach it any more. Removing a member, or a member leaving, sets `author_id` and `assignee_id` to `null` where they were that member; the activities stay. Rejoining does not bring the roles back.
 
 Passwords are 8 to 72 bytes, the limit of bcrypt.
 
@@ -228,6 +255,8 @@ A workspace is the tenant boundary. A user can belong to many, with one role in 
 | Delete the workspace | yes | no | no |
 | Change pipelines and stages | yes | yes | no |
 | Read pipelines; read and write contacts, companies, and deals | yes | yes | yes |
+| Read and create activities; complete and reopen tasks | yes | yes | yes |
+| Edit or delete an activity someone else wrote | yes | yes | no |
 
 A workspace always keeps at least one owner. Every change to a workspace or its members first takes that workspace's row lock and re-reads the actor's role, so concurrent changes cannot remove the last owner, and a role that changed after the middleware ran is not trusted.
 
