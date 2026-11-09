@@ -413,33 +413,83 @@ func TestDealOwnerForeignKeyClearsOnlyTheOwner(t *testing.T) {
 	}
 }
 
-// A company and a contact in B are out of reach from A's delete, with no policy to help.
-func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
-	tn := newTenants(t)
-	rls := New(tn.pool)
+// plantRow inserts a row the foreign keys would refuse, standing in for corrupt data,
+// which only a superuser can write. It runs in a scratch schema, so nothing else sees it.
+func plantRow(t *testing.T, owner *pgxpool.Pool, sql string, args ...any) {
+	t.Helper()
 	ctx := context.Background()
-	ofB := defaultPipeline(t, rls, tn.b.ID)
-	company := newCompany(t, rls, tn.b.ID, "Company of B")
-	contact := newContact(t, rls, tn.b.ID, "Contact of B", nil)
-	d, err := rls.CreateDeal(ctx, tn.b.ID, model.DealInput{
-		PipelineID: ofB.ID, Title: "Deal of B", Currency: "USD", CompanyID: &company.ID, ContactID: &contact.ID, OwnerID: &tn.ownerB.ID,
+	tx, err := owner.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SET LOCAL session_replication_role = replica`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, sql, args...); err != nil {
+		t.Fatalf("plant: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Deletes in A must not reach B, neither through the delete itself nor through the
+// unlinking that follows it. The store runs as a superuser here, so no policy helps:
+// only the store's own workspace filters stand between the two. A member of both
+// workspaces owns a deal in B, and a corrupt row of B points at A's company and
+// contact, so unlinking without the workspace filter would clear B's links too.
+func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
+	rls, owner := scratchStore(t)
+	ctx := context.Background()
+	s := New(owner) // A superuser: only the store's own filters apply.
+	ownerA, ownerB := newUser(t, rls), newUser(t, rls)
+	a, b := newWorkspace(t, rls, ownerA), newWorkspace(t, rls, ownerB)
+	shared := addMember(t, rls, a, ownerA, model.RoleMember)
+	if _, err := rls.AddMember(ctx, b.ID, ownerB.ID, shared.Email, model.RoleMember); err != nil {
+		t.Fatal(err)
+	}
+	ofB := defaultPipeline(t, rls, b.ID)
+	companyA, companyB := newCompany(t, rls, a.ID, "Company of A"), newCompany(t, rls, b.ID, "Company of B")
+	contactA, contactB := newContact(t, rls, a.ID, "Contact of A", nil), newContact(t, rls, b.ID, "Contact of B", nil)
+	d, err := rls.CreateDeal(ctx, b.ID, model.DealInput{
+		PipelineID: ofB.ID, Title: "Deal of B", Currency: "USD", CompanyID: &companyB.ID, ContactID: &contactB.ID, OwnerID: &shared.ID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(ownerPool(t)) // A superuser: only the store's own filters apply.
-	if err := s.DeleteCompany(ctx, tn.a.ID, company.ID); !errors.Is(err, ErrCompanyNotFound) {
-		t.Errorf("delete company = %v", err)
+	plantRow(t, owner, `
+		INSERT INTO deals (workspace_id, pipeline_id, stage_id, title, currency, company_id, contact_id, position)
+		VALUES ($1, $2, $3, 'Planted in B', 'USD', $4, $5, 99)`, b.ID, ofB.ID, ofB.Stages[0].ID, companyA.ID, contactA.ID)
+
+	// B's rows are out of reach from A.
+	if err := s.DeleteCompany(ctx, a.ID, companyB.ID); !errors.Is(err, ErrCompanyNotFound) {
+		t.Errorf("delete B's company = %v", err)
 	}
-	if err := s.DeleteContact(ctx, tn.a.ID, contact.ID); !errors.Is(err, ErrContactNotFound) {
-		t.Errorf("delete contact = %v", err)
+	if err := s.DeleteContact(ctx, a.ID, contactB.ID); !errors.Is(err, ErrContactNotFound) {
+		t.Errorf("delete B's contact = %v", err)
 	}
-	if err := s.RemoveMember(ctx, tn.a.ID, tn.ownerA.ID, tn.ownerB.ID); !errors.Is(err, ErrMemberNotFound) {
-		t.Errorf("remove member = %v", err)
+	if err := s.RemoveMember(ctx, a.ID, ownerA.ID, ownerB.ID); !errors.Is(err, ErrMemberNotFound) {
+		t.Errorf("remove B's owner = %v", err)
 	}
-	got, err := rls.GetDeal(ctx, tn.b.ID, d.ID)
-	if err != nil || got.CompanyID == nil || got.ContactID == nil || got.OwnerID == nil {
-		t.Errorf("B's deal after the attempts = %+v, %v", got, err)
+	// A's own deletes succeed and unlink only A's rows.
+	if err := s.DeleteCompany(ctx, a.ID, companyA.ID); err != nil {
+		t.Errorf("delete A's company: %v", err)
+	}
+	if err := s.DeleteContact(ctx, a.ID, contactA.ID); err != nil {
+		t.Errorf("delete A's contact: %v", err)
+	}
+	if err := s.RemoveMember(ctx, a.ID, ownerA.ID, shared.ID); err != nil {
+		t.Errorf("remove the shared member from A: %v", err)
+	}
+
+	got, err := rls.GetDeal(ctx, b.ID, d.ID)
+	if err != nil || got.CompanyID == nil || got.ContactID == nil || got.OwnerID == nil || *got.OwnerID != shared.ID {
+		t.Errorf("B's deal after A's deletes = %+v, %v", got, err)
+	}
+	if n := countRows(t, owner, `SELECT count(*) FROM deals WHERE workspace_id = $1 AND company_id = $2 AND contact_id = $3`,
+		b.ID, companyA.ID, contactA.ID); n != 1 {
+		t.Errorf("A's deletes unlinked a row of B: %d planted rows left", n)
 	}
 }
 
