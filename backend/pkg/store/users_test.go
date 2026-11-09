@@ -263,8 +263,13 @@ func TestRevokeUnknownTokenIsNoOp(t *testing.T) {
 	}
 }
 
+// A held row lock makes the race deterministic. Holding the token row stalls
+// every rotation at its write, after it has read the token. Without the family
+// lock, all of them would read an unspent token before stalling, and all would
+// then succeed.
 func TestConcurrentRotationOutsideGraceHasOneWinner(t *testing.T) {
-	s := New(testdb.AppPool(t))
+	pool := testdb.AppPool(t)
+	s := New(pool)
 	ctx := context.Background()
 	u := newUser(t, s)
 	raw, err := s.IssueRefreshToken(ctx, u.ID, testTTL)
@@ -272,17 +277,27 @@ func TestConcurrentRotationOutsideGraceHasOneWinner(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	blocker, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Rollback(ctx)
+	if _, err := blocker.Exec(ctx, `SELECT 1 FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE`, hashRefreshToken(raw)); err != nil {
+		t.Fatal(err)
+	}
+
 	const racers = 12
 	var wg sync.WaitGroup
-	start := make(chan struct{})
 	errs := make([]error, racers)
 	for i := range racers {
 		wg.Go(func() {
-			<-start
 			_, _, errs[i] = s.RotateRefreshToken(ctx, raw, testTTL, noGrace)
 		})
 	}
-	close(start)
+	time.Sleep(500 * time.Millisecond)
+	if err := blocker.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	wg.Wait()
 
 	wins := 0

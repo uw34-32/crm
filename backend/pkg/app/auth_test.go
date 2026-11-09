@@ -402,6 +402,43 @@ func TestMeRejectsBadCredentials(t *testing.T) {
 	}
 }
 
+// The handler behind the middleware must never run without a verified token,
+// whatever it would do with an empty identity.
+func TestRequireAuthStopsUnverifiedRequests(t *testing.T) {
+	manager := testManager(t, time.Minute)
+	a := New(store.New(unreachablePool(t)), manager, WithPasswordCost(bcrypt.MinCost))
+	called, reached := false, ""
+	h := a.requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		reached, _ = r.Context().Value(contextKey{}).(string)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	send := func(header string) int {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.Header.Set("Authorization", header)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec.Code
+	}
+
+	for _, header := range []string{"", "Bearer", "Bearer not-a-token", "Basic abc"} {
+		if got := send(header); got != http.StatusUnauthorized {
+			t.Errorf("%q = %d, want 401", header, got)
+		}
+		if called {
+			t.Fatalf("%q reached the handler", header)
+		}
+	}
+
+	token, err := manager.Generate("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := send("Bearer " + token); got != http.StatusNoContent || reached != "user-1" {
+		t.Errorf("valid token = %d with identity %q", got, reached)
+	}
+}
+
 // A store failure must surface as an error, never as an authenticated response.
 func TestAuthFailsClosedWhenDatabaseUnavailable(t *testing.T) {
 	pool := unreachablePool(t)
