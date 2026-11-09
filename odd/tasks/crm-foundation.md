@@ -51,7 +51,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
 - [x] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
 - [x] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
-- [ ] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
+- [x] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
 - [ ] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
 - [ ] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T9 Web pipeline and activities.** Kanban board with stage moves, deal detail, activity timeline. Checks: `pnpm check`, `pnpm build`, browser run.
@@ -75,6 +75,17 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | T5 | `bce3adf`, `7df945d`, `31e2d68`, `3dc98bc` | build, vet, gofmt clean; 783 test passes as `crm_app`, parent re-ran `go test`; default pipeline, deal moves, and cross-workspace 404 observed over HTTP | medium; one review of the whole range exceeded the reviewer context budget, so each commit was reviewed separately with owner consent: 4 of 4 approved and acknowledged |
 
+| T5 follow-ups and T6 | `743a361`, `62c2286`, `b00fd92`, `9e941bd`, `ec47be6` | build, vet, gofmt clean; 928 test passes as `crm_app`, parent re-ran `go test`; timeline, task completion, unlink on delete, 409 on last pipeline, and cross-workspace 404 observed over HTTP | medium, granted, one review of the range approved and acknowledged |
+
+T5 follow-ups are fixed: the last live pipeline returns 409, the blank `lost_reason` case, the README table, the two weak tests, and invalid UTF-8 on contacts and companies.
+
+T6 decisions: `due_at`, `assignee_id`, and `completed_at` exist only on tasks, enforced by handlers and a check constraint; `kind` never changes; only the author, an owner, or an admin edits or deletes an activity, and every member reads, creates, completes, and reopens; deleting a linked record clears that link, and an activity left with no link is soft-deleted; removing a member clears author and assignee; the timeline is newest first.
+
+T6 review warnings, not yet fixed:
+
+- A blank or `null` `lost_reason` is refused on every move, including into a lost stage, and its message contradicts the lost-stage rule (`backend/pkg/app/deals.go:283-286`).
+- A `due_at` with fractional seconds in the last second of 2200 passes the handler and fails the database check as a 500 (`backend/pkg/app/activities.go:52-59`).
+
 T5 decisions: stages soft-delete with `position` NULL; dense integer positions serialized on the pipeline row lock, with last-wins moves and no version check; a removed member's deals keep no owner and do not regain one on rejoin; deleting a pipeline or stage with live deals returns 409; deals start only in an open stage; value is integer minor units; migration 009 refuses a role that cannot bypass Row-Level Security.
 
 T5 review warnings, none blocking and not yet fixed:
@@ -97,4 +108,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 in progress on `feat/crm-activities` through one delegated writer, starting with the T5 review warnings; its delivery is the owner's decision. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 is done on `feat/crm-activities`; its delivery is the owner's decision. Next: fix the two T6 warnings, then T7, the first client. `origin` uses SSH on port 443 because port 22 times out.
