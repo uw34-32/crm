@@ -39,7 +39,7 @@ Out of scope for this feature: integration with `contacts`, email or calendar sy
 - Strategy: `ask-on-risk`. Chain strategy: `stacked-to-main` (user decision, 2026-11-08).
 - T1 through T3 override (user decision, 2026-11-08): rebase on `origin/main`, merge directly to `main`, and push, with no pull requests. Later tasks keep the chain below unless the owner says otherwise.
 - Slice boundaries: one pull request per task, T4 through T12, in order. Commits per pull request are recorded in Progress.
-- Reviewed boundary: `8db8e0a`, the empty root commit of `main`.
+- Base: `44e1050`, the initial commit of `origin/main`, after rebasing.
 - Push and pull request creation remain the user's decision.
 
 ## Checklist
@@ -63,13 +63,13 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | Task | Commit | Verification | Review tier and outcome |
 | --- | --- | --- | --- |
-| T1 (partial, open: `.env.example`) | `be73fb0`, `86c24c5`, `b33a61f` | build, vet, gofmt clean; 14/14 tests with database, parent re-ran `go test`; `/health` 200 and 503 observed; migrations idempotent | high, granted, approved and acknowledged |
+| T1 (partial, open: `.env.example`) | `71efd8f`, `a6014ec`, `1201a87` | build, vet, gofmt clean; 14/14 tests with database, parent re-ran `go test`; `/health` 200 and 503 observed; migrations idempotent | high, granted, approved and acknowledged |
 
-| T1 closure and T2 | `442b607`, `4477ece`, `03c8a40`, `96c1e23`, `bce9b3a`, `d3c9df0`, `84ca825` | build, vet, gofmt clean; 169 test passes as `crm_app`, parent re-ran `go test`; auth flow, reuse revocation, CORS, and rate limit observed over HTTP | high, granted, approved and acknowledged |
+| T1 closure and T2 | `bc6f259`, `96c6e30`, `112532d`, `ec3eacb`, `dce66bc`, `ab8b7a4`, `5231ba4` | build, vet, gofmt clean; 169 test passes as `crm_app`, parent re-ran `go test`; auth flow, reuse revocation, CORS, and rate limit observed over HTTP | high, granted, approved and acknowledged |
 
-| Auth hardening and T3 | `a47fc76`, `5124905`, `4052d54`, `802a508` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review declined by the owner for this candidate; independent verifier passed |
+| Auth hardening and T3 | `1ebd9c1`, `e68532a`, `7df96db`, `9d626bc` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review declined by the owner for this candidate; independent verifier passed |
 
-Last reviewed boundary: `84ca825`.
+Last reviewed boundary: `5231ba4`.
 
 ### Open items
 
