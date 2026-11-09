@@ -69,16 +69,15 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | Auth hardening and T3 | `1ebd9c1`, `e68532a`, `7df96db`, `9d626bc` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review declined by the owner for this candidate; independent verifier passed |
 
-Last reviewed boundary: `5231ba4`.
+Next assessment base: `5eee932`, the `main` commit pushed on 2026-11-09. The T3 range has no review receipt, because the owner declined it.
 
 ### Open items
 
 - `.env.example` was created by the owner and lacks the optional `AUTH_SESSION_RATE_LIMIT_PER_MINUTE` (default 600). The agent's permission settings deny editing it.
-- `git fetch origin` over SSH timed out on port 22, so the remote's contents are unknown. The owner reports existing content there, so a rebase is expected before merging and pushing. Commit hashes in this file change after that rebase.
 - RLS risks from T3: it does not stop SQL injection, because arbitrary SQL can call `set_config`; it does not enforce soft delete; an owner or admin can add any registered email with no consent step.
 - Pending owner decision: register returns 409 for a taken email, which reveals accounts (`backend/pkg/app/auth.go:101-104`). Hiding it needs email verification, which is outside this feature.
 - Eight review suggestions are not scheduled.
 
 ## Next step
 
-Finish the T3 review, resolve remote access and the rebase with the owner, then start T4.
+T4 in progress through one delegated writer on `feat/crm-contacts-companies`. `origin` uses SSH on port 443 because port 22 times out.
