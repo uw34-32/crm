@@ -349,6 +349,10 @@ func TestCompanyInputValidation(t *testing.T) {
 	wantStatus(t, call(t, h, http.MethodPost, base, owner.Token, map[string]any{}), http.StatusBadRequest, "create with no name")
 	wantStatus(t, call(t, h, http.MethodPatch, base+"/"+existing.ID, owner.Token, map[string]any{}), http.StatusBadRequest, "update with nothing")
 	wantStatus(t, call(t, h, http.MethodPost, base, owner.Token, "not an object"), http.StatusBadRequest, "not an object")
+	// The JSON decoder would silently replace invalid UTF-8, storing something the
+	// client never sent.
+	wantStatus(t, callRaw(t, h, http.MethodPost, base, owner.Token, []byte("{\"name\":\"a\xffb\"}")), http.StatusBadRequest, "create with invalid UTF-8")
+	wantStatus(t, callRaw(t, h, http.MethodPatch, base+"/"+existing.ID, owner.Token, []byte("{\"industry\":\"a\xffb\"}")), http.StatusBadRequest, "update with invalid UTF-8")
 
 	// A failed update changes nothing.
 	got := data[companyBody](t, call(t, h, http.MethodGet, base+"/"+existing.ID, owner.Token, nil))
@@ -397,6 +401,8 @@ func TestContactInputValidation(t *testing.T) {
 	}
 	wantStatus(t, call(t, h, http.MethodPost, base, owner.Token, map[string]any{}), http.StatusBadRequest, "create with no name")
 	wantStatus(t, call(t, h, http.MethodPatch, base+"/"+existing.ID, owner.Token, map[string]any{}), http.StatusBadRequest, "update with nothing")
+	wantStatus(t, callRaw(t, h, http.MethodPost, base, owner.Token, []byte("{\"first_name\":\"a\xffb\"}")), http.StatusBadRequest, "create with invalid UTF-8")
+	wantStatus(t, callRaw(t, h, http.MethodPatch, base+"/"+existing.ID, owner.Token, []byte("{\"title\":\"a\xffb\"}")), http.StatusBadRequest, "update with invalid UTF-8")
 
 	got := data[contactBody](t, call(t, h, http.MethodGet, base+"/"+existing.ID, owner.Token, nil))
 	if got.FirstName != "Existing" || got.Email != "" {

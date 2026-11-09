@@ -243,6 +243,10 @@ func TestMoveDealOverHTTP(t *testing.T) {
 		{"fractional position", map[string]any{"stage_id": p.Stages[0].ID, "position": 1.5}, http.StatusBadRequest},
 		{"reason on an open stage", map[string]any{"stage_id": p.Stages[0].ID, "lost_reason": "x"}, http.StatusBadRequest},
 		{"reason on a won stage", map[string]any{"stage_id": won.ID, "lost_reason": "x"}, http.StatusBadRequest},
+		// Sent but blank is still sent: only a lost stage takes a reason.
+		{"blank reason on an open stage", map[string]any{"stage_id": p.Stages[0].ID, "lost_reason": "   "}, http.StatusBadRequest},
+		{"empty reason on a won stage", map[string]any{"stage_id": won.ID, "lost_reason": ""}, http.StatusBadRequest},
+		{"null reason on an open stage", map[string]any{"stage_id": p.Stages[0].ID, "lost_reason": nil}, http.StatusBadRequest},
 		{"long reason", map[string]any{"stage_id": lost.ID, "lost_reason": strings.Repeat("x", 501)}, http.StatusBadRequest},
 		{"NUL in reason", map[string]any{"stage_id": lost.ID, "lost_reason": "a\x00b"}, http.StatusBadRequest},
 		{"stage of another pipeline", map[string]any{"stage_id": other.Stages[0].ID}, http.StatusNotFound},

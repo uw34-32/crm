@@ -79,7 +79,7 @@ T5 decisions: stages soft-delete with `position` NULL; dense integer positions s
 
 T5 review warnings, none blocking and not yet fixed:
 
-- `DeletePipeline` can delete a workspace's last pipeline, leaving nowhere to create deals (`backend/pkg/store/pipelines.go:215-230`). Product decision for the owner.
+- `DeletePipeline` can delete a workspace's last pipeline, leaving nowhere to create deals (`backend/pkg/store/pipelines.go:215-230`). Owner decision, 2026-11-09: return 409.
 - A blank `lost_reason` sent to an open or won stage returns 200, while the README says 400 (`backend/pkg/app/deals.go:276`).
 - A blank line splits the README route table, so new rows render as plain text (`README.md:106`).
 - `TestConcurrentStageWritesKeepPositionsDense` does not race reorder or delete (`backend/pkg/store/pipelines_test.go:579-590`).
@@ -97,4 +97,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 is done on `feat/crm-pipelines-deals`; its delivery is the owner's decision. Next: T6. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 in progress on `feat/crm-activities` through one delegated writer, starting with the T5 review warnings; its delivery is the owner's decision. `origin` uses SSH on port 443 because port 22 times out.

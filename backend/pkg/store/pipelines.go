@@ -24,6 +24,9 @@ var (
 	ErrLastOpenStage = errors.New("a pipeline must keep at least one open stage")
 	// ErrStageOrderMismatch means a reorder did not name every live stage exactly once.
 	ErrStageOrderMismatch = errors.New("the order must name every stage of the pipeline exactly once")
+	// ErrLastPipeline means the delete would leave the workspace with no pipeline, and
+	// so with nowhere for a new deal to start.
+	ErrLastPipeline = errors.New("a workspace must keep at least one pipeline")
 )
 
 const (
@@ -212,7 +215,12 @@ func (s *Store) RenamePipeline(ctx context.Context, workspaceID, actorID, id, na
 }
 
 // DeletePipeline soft-deletes a pipeline, unless it still holds live deals, which would
-// be left somewhere nobody can see. Owners and admins only.
+// be left somewhere nobody can see, or it is the workspace's last one. Owners and
+// admins only.
+//
+// The count of the others is read under the workspace lock that requireManager takes,
+// which every pipeline create and delete takes first, so two deletes cannot each see
+// the other's pipeline still live and remove both.
 func (s *Store) DeletePipeline(ctx context.Context, workspaceID, actorID, id string) error {
 	return s.InWorkspace(ctx, workspaceID, func(q Querier) error {
 		if err := requireManager(ctx, q, workspaceID, actorID); err != nil {
@@ -227,6 +235,16 @@ func (s *Store) DeletePipeline(ctx context.Context, workspaceID, actorID, id str
 		}
 		if holds {
 			return ErrPipelineHasDeals
+		}
+		var others int
+		if err := q.QueryRow(ctx, `
+			SELECT count(*) FROM pipelines
+			 WHERE workspace_id = $1::text::uuid AND id <> $2::text::uuid AND deleted_at IS NULL`,
+			workspaceID, id).Scan(&others); err != nil {
+			return fmt.Errorf("count pipelines: %w", err)
+		}
+		if others == 0 {
+			return ErrLastPipeline
 		}
 		if _, err := q.Exec(ctx, `
 			UPDATE pipelines SET deleted_at = now(), updated_at = now()

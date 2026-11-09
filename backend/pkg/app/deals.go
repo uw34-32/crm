@@ -280,6 +280,10 @@ func (a *App) moveDeal(w http.ResponseWriter, r *http.Request) {
 		problem = "stage_id is required"
 	case req.Position.Value != nil && *req.Position.Value < 0:
 		problem = "position must not be negative"
+	// Sent but blank or null is not the same as left out: only a lost stage takes a
+	// reason, and a blank one is no reason.
+	case req.LostReason.Set && reason == "":
+		problem = "lost_reason must not be blank or null; leave it out unless the deal moves into a lost stage"
 	case hasNUL(reason):
 		problem = msgInvalidBody
 	case utf8.RuneCountInString(reason) > maxLostReasonRunes:

@@ -54,6 +54,8 @@ func crmFailure(w http.ResponseWriter, op string, err error) {
 		errResp(w, http.StatusConflict, "the stage still holds deals")
 	case errors.Is(err, store.ErrLastOpenStage):
 		errResp(w, http.StatusConflict, "a pipeline must keep at least one open stage")
+	case errors.Is(err, store.ErrLastPipeline):
+		errResp(w, http.StatusConflict, "a workspace must keep at least one pipeline")
 	case errors.Is(err, store.ErrStageOrderMismatch):
 		errResp(w, http.StatusConflict, "stage_ids must list every stage of the pipeline exactly once")
 	default:

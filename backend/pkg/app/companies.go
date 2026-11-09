@@ -53,7 +53,7 @@ func (c *companyRequest) normalize() string {
 
 func decodeCompany(w http.ResponseWriter, r *http.Request) (companyRequest, bool) {
 	var req companyRequest
-	if err := decodeJSON(w, r, &req); err != nil {
+	if err := decodeText(w, r, &req); err != nil {
 		errResp(w, http.StatusBadRequest, msgInvalidBody)
 		return companyRequest{}, false
 	}

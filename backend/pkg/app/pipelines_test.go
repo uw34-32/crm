@@ -225,6 +225,14 @@ func TestStageRulesAnswerConflict(t *testing.T) {
 	wantStatus(t, call(t, h, http.MethodDelete, "/workspaces/"+w.ID+"/deals/"+deal.ID, owner.Token, nil), http.StatusNoContent, "delete the deal")
 	wantStatus(t, call(t, h, http.MethodDelete, base+"/"+last, owner.Token, nil), http.StatusNoContent, "delete the emptied stage")
 	wantStatus(t, call(t, h, http.MethodDelete, pipelinesPath(w.ID)+"/"+p.ID, owner.Token, nil), http.StatusNoContent, "delete the emptied pipeline")
+
+	// The workspace keeps its last pipeline, so a deal always has somewhere to start.
+	remaining := firstPipeline(t, h, owner.Token, w.ID)
+	rec = call(t, h, http.MethodDelete, pipelinesPath(w.ID)+"/"+remaining.ID, owner.Token, nil)
+	wantStatus(t, rec, http.StatusConflict, "delete the last pipeline")
+	if !strings.Contains(rec.Body.String(), "at least one pipeline") {
+		t.Errorf("last pipeline: body = %s", rec.Body)
+	}
 }
 
 func TestPipelineRoleLimitsOverHTTP(t *testing.T) {

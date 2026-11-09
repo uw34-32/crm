@@ -57,7 +57,7 @@ func (c *contactRequest) normalize() string {
 
 func decodeContact(w http.ResponseWriter, r *http.Request) (contactRequest, bool) {
 	var req contactRequest
-	if err := decodeJSON(w, r, &req); err != nil {
+	if err := decodeText(w, r, &req); err != nil {
 		errResp(w, http.StatusBadRequest, msgInvalidBody)
 		return contactRequest{}, false
 	}

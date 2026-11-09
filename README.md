@@ -92,7 +92,6 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `POST /workspaces/{id}/members` | `email`, `role` | 201 with the member | Owner or admin; 404 for an unknown email, 409 for an existing member |
 | `PATCH /workspaces/{id}/members/{userID}` | `role` | 200 with the member | Owner or admin; 409 for the last owner |
 | `DELETE /workspaces/{id}/members/{userID}` | | 204 | Owner or admin; 409 for the last owner |
-
 | `GET /workspaces/{id}/companies` | | 200 with a page of companies | See [Contacts and companies](#contacts-and-companies) |
 | `POST /workspaces/{id}/companies` | `name`, optional `domain`, `phone`, `industry`, `address` | 201 with the company | |
 | `GET /workspaces/{id}/companies/{companyID}` | | 200 with the company | |
@@ -103,12 +102,11 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `GET /workspaces/{id}/contacts/{contactID}` | | 200 with the contact | |
 | `PATCH /workspaces/{id}/contacts/{contactID}` | Any of the create fields | 200 with the contact | `company_id: null` removes the link |
 | `DELETE /workspaces/{id}/contacts/{contactID}` | | 204 | A soft delete; its deals stay and lose the link |
-
 | `GET /workspaces/{id}/pipelines` | | 200 with a page of pipelines, without stages | See [Pipelines and deals](#pipelines-and-deals) |
 | `POST /workspaces/{id}/pipelines` | `name` | 201 with the pipeline and default stages | Owner or admin |
 | `GET /workspaces/{id}/pipelines/{pipelineID}` | | 200 with the pipeline and its stages in order | |
 | `PATCH /workspaces/{id}/pipelines/{pipelineID}` | `name` | 200 with the pipeline | Owner or admin |
-| `DELETE /workspaces/{id}/pipelines/{pipelineID}` | | 204 | Owner or admin; a soft delete; 409 while it holds live deals |
+| `DELETE /workspaces/{id}/pipelines/{pipelineID}` | | 204 | Owner or admin; a soft delete; 409 while it holds live deals, or for the workspace's last pipeline |
 | `POST /workspaces/{id}/pipelines/{pipelineID}/stages` | `name`, optional `color`, `probability`, `kind`, `position` | 201 with the stage | Owner or admin |
 | `PATCH /workspaces/{id}/pipelines/{pipelineID}/stages/{stageID}` | Any of `name`, `color`, `probability`, `kind` | 200 with the stage | Owner or admin; 409 to change the kind while it holds live deals, or to take away the last open stage |
 | `PUT /workspaces/{id}/pipelines/{pipelineID}/stages/order` | `stage_ids` | 200 with the stages | Owner or admin; 409 unless it lists every stage exactly once |
@@ -126,7 +124,7 @@ Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin
 
 Every member of a workspace, whatever their role, can read and write its contacts and companies.
 
-A contact or company that is in another workspace, soft-deleted, nonexistent, or named by a malformed ID gets the same 404 with an identical body. The same goes for a `company_id` in a request body: a contact can link only a live company in its own workspace. Anything else that is invalid gets a 400: text beyond its limit, a NUL character, a `PATCH` with no fields, or a `PATCH` that sets a text field to `null`. Text is trimmed, a `PATCH` changes only the fields it names, and an empty string clears an optional field.
+A contact or company that is in another workspace, soft-deleted, nonexistent, or named by a malformed ID gets the same 404 with an identical body. The same goes for a `company_id` in a request body: a contact can link only a live company in its own workspace. Anything else that is invalid gets a 400: text beyond its limit, a NUL character, invalid UTF-8, a `PATCH` with no fields, or a `PATCH` that sets a text field to `null`. Text is trimmed, a `PATCH` changes only the fields it names, and an empty string clears an optional field.
 
 | Field | Limit |
 | --- | --- |
@@ -152,7 +150,7 @@ Search scans the live rows of one workspace, in list order, until the page is fu
 
 Every member can read and write deals. Only an owner or admin can change pipelines and stages, and the role is re-read inside the transaction.
 
-A new workspace gets a default pipeline, `Sales`, in the same transaction, with the stages Lead, Qualified, Proposal, Negotiation, Won, and Lost. `009_pipelines.sql` gave every existing workspace the same one, through the one SQL function that defines the default stages. A new pipeline starts with those stages too, so it always has an open stage.
+A workspace always keeps at least one pipeline, so a deal always has somewhere to start: deleting the last one gets a 409. Pipeline creates and deletes run one at a time on the workspace row lock, so two concurrent deletes cannot remove the last two. A new workspace gets a default pipeline, `Sales`, in the same transaction, with the stages Lead, Qualified, Proposal, Negotiation, Won, and Lost. `009_pipelines.sql` gave every existing workspace the same one, through the one SQL function that defines the default stages. A new pipeline starts with those stages too, so it always has an open stage.
 
 A stage's `kind`, one of `open`, `won`, or `lost`, says what being in it means. Nothing reads a stage's name to decide that. A pipeline keeps at least one open stage. Stages soft-delete, like pipelines and deals, so a soft-deleted deal keeps a valid reference to the stage it was in.
 
@@ -182,8 +180,8 @@ A move puts a deal at a position in a stage of its own pipeline, and every membe
 
 | Into | `closed_at` | `lost_reason` |
 | --- | --- | --- |
-| `open` | Cleared | Cleared; a 400 if one is sent |
-| `won` | Set to now | Cleared; a 400 if one is sent |
+| `open` | Cleared | Cleared; a 400 if one is sent, even blank or `null` |
+| `won` | Set to now | Cleared; a 400 if one is sent, even blank or `null` |
 | `lost` | Set to now | Required, or a 400 |
 | The stage it is already in | Unchanged | Unchanged, unless a lost stage is given a new one |
 

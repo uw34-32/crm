@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"testing"
@@ -235,6 +236,89 @@ func TestPipelineLifecycle(t *testing.T) {
 	var kept int
 	if err := ownerPool(t).QueryRow(ctx, `SELECT count(*) FROM pipelines WHERE id = $1 AND deleted_at IS NOT NULL`, created.ID).Scan(&kept); err != nil || kept != 1 {
 		t.Errorf("soft-deleted rows = %d, %v", kept, err)
+	}
+}
+
+// A workspace keeps at least one pipeline, so a deal always has somewhere to start.
+func TestLastPipelineCannotBeDeleted(t *testing.T) {
+	s := New(testdb.AppPool(t))
+	ctx := context.Background()
+	owner := newUser(t, s)
+	w := newWorkspace(t, s, owner)
+	first := defaultPipeline(t, s, w.ID)
+
+	if err := s.DeletePipeline(ctx, w.ID, owner.ID, first.ID); !errors.Is(err, ErrLastPipeline) {
+		t.Errorf("delete the only pipeline = %v, want ErrLastPipeline", err)
+	}
+	second := newPipeline(t, s, w.ID, owner.ID, "Second")
+	if err := s.DeletePipeline(ctx, w.ID, owner.ID, first.ID); err != nil {
+		t.Errorf("delete one of two: %v", err)
+	}
+	if err := s.DeletePipeline(ctx, w.ID, owner.ID, second.ID); !errors.Is(err, ErrLastPipeline) {
+		t.Errorf("delete the one left = %v, want ErrLastPipeline", err)
+	}
+	if _, err := s.GetPipeline(ctx, w.ID, second.ID); err != nil {
+		t.Errorf("the last pipeline is gone: %v", err)
+	}
+}
+
+// holdWorkspace is holdPipeline for the workspace row, which every pipeline change
+// takes first.
+func holdWorkspace(t *testing.T, owner *pgxpool.Pool, workspaceID, app string, racers int) (release func()) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := owner.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM workspaces WHERE id = $1 FOR NO KEY UPDATE`, workspaceID); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		t.Helper()
+		waitQueued(t, owner, app, racers)
+		if err := tx.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Two deletes of the only two pipelines both queue before either runs, so each would
+// see the other still live if they did not run one at a time. Exactly one may win.
+func TestConcurrentDeletesKeepOnePipeline(t *testing.T) {
+	s, _, app := raceStore(t, 4)
+	ctx := context.Background()
+	owner := ownerPool(t)
+	user := newUser(t, s)
+	w := newWorkspace(t, s, user)
+	ids := []string{defaultPipeline(t, s, w.ID).ID, newPipeline(t, s, w.ID, user.ID, "Second").ID}
+
+	release := holdWorkspace(t, owner, w.ID, app, len(ids))
+	var wg sync.WaitGroup
+	errs := make([]error, len(ids))
+	for i, id := range ids {
+		wg.Go(func() { errs[i] = s.DeletePipeline(ctx, w.ID, user.ID, id) })
+	}
+	release()
+	wg.Wait()
+
+	won, refused := 0, 0
+	for i, err := range errs {
+		switch {
+		case err == nil:
+			won++
+		case errors.Is(err, ErrLastPipeline):
+			refused++
+		default:
+			t.Errorf("delete %d: %v", i, err)
+		}
+	}
+	if won != 1 || refused != 1 {
+		t.Errorf("%d deletes won and %d were refused, want 1 and 1", won, refused)
+	}
+	if n := countRows(t, owner, `SELECT count(*) FROM pipelines WHERE workspace_id = $1 AND deleted_at IS NULL`, w.ID); n != 1 {
+		t.Errorf("%d live pipelines, want 1", n)
 	}
 }
 
@@ -564,45 +648,90 @@ func TestReorderStages(t *testing.T) {
 	}
 }
 
-// Overlapping writes to one pipeline's stages run one at a time, so positions stay
-// dense whatever the interleaving.
+// Creates, reorders, and deletes on one pipeline all read the board before any of them
+// can act, and queue in a known order behind the workspace lock. Each must then work
+// from what the one before it left: positions stay dense, every stage lands where it
+// was asked to, and a reorder made from a board that has since changed is refused.
 func TestConcurrentStageWritesKeepPositionsDense(t *testing.T) {
-	s := New(testdb.AppPool(t))
+	const racers = 8
+	s, _, app := raceStore(t, racers+2)
 	ctx := context.Background()
-	owner := newUser(t, s)
-	w := newWorkspace(t, s, owner)
-	p := newPipeline(t, s, w.ID, owner.ID, "Busy")
-	ids := make([]string, len(p.Stages))
-	for i, stage := range p.Stages {
-		ids[i] = stage.ID
+	owner := ownerPool(t)
+	user := newUser(t, s)
+	w := newWorkspace(t, s, user)
+	p := newPipeline(t, s, w.ID, user.ID, "Busy")
+	spares := make([]model.PipelineStage, 3)
+	for i := range spares {
+		spares[i] = newStage(t, s, w.ID, user.ID, p.ID, fmt.Sprintf("Spare %d", i), model.StageOpen)
 	}
-	reversed := slices.Clone(ids)
-	slices.Reverse(reversed)
+	before, err := s.GetPipeline(ctx, w.ID, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reversed := make([]string, len(before.Stages))
+	board := make([]string, len(before.Stages)) // The names the board should end with.
+	for i, stage := range before.Stages {
+		reversed[len(reversed)-1-i] = stage.ID
+		board[len(board)-1-i] = stage.Name
+	}
 
-	var wg sync.WaitGroup
-	errs := make(chan error, 16)
-	zero := 0
-	for range 8 {
-		wg.Go(func() {
-			_, err := s.CreateStage(ctx, w.ID, owner.ID, p.ID, model.StageInput{Name: "Added", Color: "#000000", Kind: model.StageOpen, Position: &zero})
-			errs <- err
-		})
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			t.Errorf("concurrent create: %v", err)
+	create := func(name string, position *int) func() error {
+		return func() error {
+			_, err := s.CreateStage(ctx, w.ID, user.ID, p.ID, model.StageInput{Name: name, Color: "#000000", Kind: model.StageOpen, Position: position})
+			return err
 		}
 	}
+	reorder := func() error {
+		_, err := s.ReorderStages(ctx, w.ID, user.ID, p.ID, reversed)
+		return err
+	}
+	remove := func(stage model.PipelineStage) func() error {
+		return func() error { return s.DeleteStage(ctx, w.ID, user.ID, p.ID, stage.ID) }
+	}
+	without := func(names []string, name string) []string {
+		return slices.DeleteFunc(names, func(n string) bool { return n == name })
+	}
+	steps := []struct {
+		run     func() error
+		want    error
+		applied func([]string) []string
+	}{
+		{reorder, nil, func(b []string) []string { return b }},
+		{create("First", intPtr(0)), nil, func(b []string) []string { return slices.Insert(b, 0, "First") }},
+		{remove(spares[0]), nil, func(b []string) []string { return without(b, spares[0].Name) }},
+		{create("Last", nil), nil, func(b []string) []string { return append(b, "Last") }},
+		// Made from the board as it was before the race: it no longer names every stage.
+		{reorder, ErrStageOrderMismatch, func(b []string) []string { return b }},
+		{remove(spares[1]), nil, func(b []string) []string { return without(b, spares[1].Name) }},
+		{create("Third", intPtr(2)), nil, func(b []string) []string { return slices.Insert(b, 2, "Third") }},
+		{remove(spares[2]), nil, func(b []string) []string { return without(b, spares[2].Name) }},
+	}
+
+	release := holdWorkspace(t, owner, w.ID, app, len(steps))
+	var wg sync.WaitGroup
+	errs := make([]error, len(steps))
+	for i, step := range steps {
+		wg.Go(func() { errs[i] = step.run() })
+		// Queue each behind the last, so the order they run in is known.
+		waitQueued(t, owner, app, i+1)
+	}
+	release()
+	wg.Wait()
+	for i, step := range steps {
+		if !errors.Is(errs[i], step.want) {
+			t.Errorf("step %d = %v, want %v", i, errs[i], step.want)
+		}
+		board = step.applied(board)
+	}
+
 	got, err := s.GetPipeline(ctx, w.ID, p.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Stages) != len(ids)+8 {
-		t.Errorf("%d stages, want %d", len(got.Stages), len(ids)+8)
-	}
 	wantDensePositions(t, got.Stages)
+	if names := stageNames(got.Stages); !slices.Equal(names, board) {
+		t.Errorf("stages = %q, want %q", names, board)
+	}
 }
 
 func TestPipelineStoreFiltersWithoutRLS(t *testing.T) {
