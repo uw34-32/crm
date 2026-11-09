@@ -297,10 +297,162 @@ textarea:focus-visible,
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-in { animation: fadeIn 0.2s cubic-bezier(0.25, 1, 0.5, 1); }
 
+/* On a phone the tab bar takes the bottom edge, so the toast sits above it. */
+@media (max-width: 600px) {
+  :root:has(.tabbar) .toast { bottom: calc(56px + 16px + env(safe-area-inset-bottom)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
   .animate-in { animation: none; }
   .btn:active { transform: none; }
+}
+
+/* Pages */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+  overflow-wrap: anywhere;
+}
+
+.page-title:focus { outline: none; }
+
+.page-lede {
+  margin: 4px 0 20px;
+  color: var(--text2);
+  font-size: 0.9375rem;
+}
+
+/* Lists: one bordered row per record, with the whole row as the link. */
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.list-item:hover { background: var(--surface2); text-decoration: none; }
+
+.list-item-content { flex: 1; min-width: 0; }
+
+.list-item-name,
+.list-item-detail {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-item-name { font-size: 1rem; font-weight: 500; color: var(--text); }
+.list-item-detail { font-size: 0.875rem; color: var(--text2); }
+
+.search-bar {
+  position: sticky;
+  top: 64px;
+  z-index: var(--z-sticky);
+  padding: 8px 0;
+  margin-bottom: 8px;
+  background: var(--bg);
+}
+
+.empty-state {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text2);
+}
+
+.empty-state-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.empty-state-text {
+  max-width: 45ch;
+  margin: 0 auto 20px;
+  font-size: 0.9375rem;
+}
+
+.list-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.list-count {
+  font-size: 0.8125rem;
+  color: var(--text2);
+}
+
+.skeleton-circle { border-radius: 50%; flex-shrink: 0; }
+
+/* A ghost button for a destructive action: red text, never red fill at rest. */
+.btn-ghost.danger { color: var(--danger-text); }
+.btn-ghost.danger:hover:not(:disabled) { border-color: var(--danger); }
+
+/* Dialogs: the native modal dialog, which keeps focus inside and closes on Escape. */
+
+.modal {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  margin: auto;
+  padding: 24px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.modal::backdrop { background: rgba(0, 0, 0, 0.7); }
+
+.modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+
+.modal-text {
+  font-size: 0.9375rem;
+  color: var(--text2);
+  margin-bottom: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 /* Hidden from view but still read by screen readers. */
@@ -314,4 +466,53 @@ textarea:focus-visible,
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* Record screens */
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.detail-hero-text { min-width: 0; }
+
+.detail-subtitle {
+  margin-top: 2px;
+  color: var(--text2);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.detail-meta {
+  margin-top: 8px;
+  color: var(--text2);
+  font-size: 0.8125rem;
+}
+
+.field-value a { overflow-wrap: anywhere; }
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
 }

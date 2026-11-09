@@ -6,7 +6,7 @@
    *   id: string,
    *   label: string,
    *   value?: string,
-   *   type?: 'text' | 'email' | 'password',
+   *   type?: 'text' | 'email' | 'password' | 'tel',
    *   error?: string,
    *   hint?: string,
    *   autocomplete?: import('svelte/elements').FullAutoFill,
@@ -40,7 +40,7 @@
     {autocomplete}
     {disabled}
     spellcheck={type === 'text' ? undefined : false}
-    autocapitalize={type === 'text' ? undefined : 'off'}
+    autocapitalize={type === 'text' || type === 'tel' ? undefined : 'off'}
     aria-required={required}
     aria-invalid={error ? 'true' : undefined}
     aria-describedby={describedBy}
