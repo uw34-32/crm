@@ -37,7 +37,8 @@ Out of scope for this feature: integration with `contacts`, email or calendar sy
 
 - Forecast: about 8,000 to 10,000 authored changed lines, above the 400-line delivery budget.
 - Strategy: `ask-on-risk`. Chain strategy: `stacked-to-main` (user decision, 2026-11-08).
-- Slice boundaries: one pull request per task, T1 through T12, in order. Commits per pull request are recorded in Progress.
+- T1 through T3 override (user decision, 2026-11-08): rebase on `origin/main`, merge directly to `main`, and push, with no pull requests. Later tasks keep the chain below unless the owner says otherwise.
+- Slice boundaries: one pull request per task, T4 through T12, in order. Commits per pull request are recorded in Progress.
 - Reviewed boundary: `8db8e0a`, the empty root commit of `main`.
 - Push and pull request creation remain the user's decision.
 
@@ -66,7 +67,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | T1 closure and T2 | `442b607`, `4477ece`, `03c8a40`, `96c1e23`, `bce9b3a`, `d3c9df0`, `84ca825` | build, vet, gofmt clean; 169 test passes as `crm_app`, parent re-ran `go test`; auth flow, reuse revocation, CORS, and rate limit observed over HTTP | high, granted, approved and acknowledged |
 
-| Auth hardening and T3 | `a47fc76`, `5124905`, `4052d54`, `802a508` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review pending |
+| Auth hardening and T3 | `a47fc76`, `5124905`, `4052d54`, `802a508` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review declined by the owner for this candidate; independent verifier passed |
 
 Last reviewed boundary: `84ca825`.
 
