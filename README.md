@@ -1,10 +1,10 @@
 # CRM
 
-A team CRM. This repository currently holds the backend: configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, and pipelines with stages and deals. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository holds the backend (configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, pipelines with stages and deals, and activities) and the start of the web app: sign-in, registration, and a workspace shell. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
-Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, and PostgreSQL 16 through Docker Compose.
+Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, and PostgreSQL 16 through Docker Compose. The web app uses SvelteKit 5 with runes, Tailwind 4, and `@sveltejs/adapter-static`, built with pnpm.
 
 ## Layout
 
@@ -20,6 +20,7 @@ Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, and PostgreSQL 16 through Docker Comp
 | `backend/pkg/server` | Wires the above and runs the HTTP server |
 | `backend/pkg/testdb` | Connections for database-backed tests |
 | `scripts/` | Local development helpers |
+| `web/` | The SvelteKit web app; see [Web app](#web-app) |
 
 ## Run
 
@@ -241,6 +242,38 @@ bcrypt runs in at most as many slots as CPU cores, with a minimum of two. A requ
 A NUL character in any JSON string gets a 400.
 
 The client address is the connection's peer. Behind a reverse proxy, list it in `TRUSTED_PROXIES`, or every client shares the proxy's budget; `X-Forwarded-For` and `X-Forwarded-Proto` are read only from listed peers.
+
+## Web app
+
+`web/` is a single-page app: `adapter-static` writes `web/build` with `index.html` as the fallback for every path, and every route renders in the browser. Its design follows the `contacts` project's design system: system type, tinted neutrals, one blue accent chosen by job, hairline borders, and light and dark themes that follow the system setting.
+
+```sh
+./dev.sh          # the API, in one terminal
+cd web
+pnpm install
+pnpm dev          # http://localhost:5173
+pnpm check        # svelte-check
+pnpm test         # Vitest
+pnpm build        # web/build
+```
+
+The dev server stays on port 5173 and fails rather than move, because the API's CORS allowlist names that origin. The app calls the API directly at `VITE_API_URL`, `http://localhost:8085` by default; set it in `web/.env` or the environment for a build that talks to another API.
+
+| Path | Purpose |
+| --- | --- |
+| `web/src/lib/api/` | The API client, token storage, and logout, with their tests |
+| `web/src/lib/session.svelte.js` | The signed-in user and the shared client |
+| `web/src/lib/workspaces.svelte.js`, `web/src/lib/workspaces/` | The user's workspaces and the open one |
+| `web/src/lib/components/` | Shared components |
+| `web/src/routes/(app)/` | Screens that need a session, inside the app shell |
+
+### Session and tokens
+
+The access token lives in memory only, and the refresh token in `localStorage` under `crm.refresh_token`, so a reload trades it for a new pair and stays signed in. This is a tradeoff: script injected into the page could read the refresh token. An httpOnly cookie would hide it, but the API takes bearer tokens from three clients (web, native, and desktop) and sets no cookies, so the web app holds the token itself. Rotation with family revocation limits the damage: a stolen token that is used after its owner has rotated revokes the whole login.
+
+On a 401 the client refreshes once and retries the request once. Requests that fail at the same time share that one refresh, so the token rotates once, and a request that left with a token another one has already replaced retries with the new token without refreshing again. A refused refresh token ends the session and returns to sign-in; a lost connection or a 429 keeps it for a later try. 429 and 503 answers say how long to wait when the API sends `Retry-After`.
+
+Signing out calls `POST /auth/logout` and forgets the tokens even when that call fails. The open workspace is saved per user under `crm.workspace.<user id>`; when it no longer exists the app opens the first one, and a user with none is asked to create one. Route guards run in the browser only and keep screens to signed-in users; the API is what enforces access.
 
 ## Tenancy
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkEmail, checkName, checkPassword, safeNext } from './forms.js';
+import { checkEmail, checkName, checkPassword, safeNext, toSentence } from './forms.js';
 
 describe('checkEmail', () => {
   it.each([
@@ -57,5 +57,16 @@ describe('safeNext', () => {
     ['/register', '/dashboard']
   ])('sends %j to %j', (next, want) => {
     expect(safeNext(next)).toBe(want);
+  });
+});
+
+describe('toSentence', () => {
+  it.each([
+    ['invalid email or password', 'Invalid email or password.'],
+    ['Cannot reach the server.', 'Cannot reach the server.'],
+    ['is it?', 'Is it?'],
+    ['', '']
+  ])('turns %j into %j', (message, want) => {
+    expect(toSentence(message)).toBe(want);
   });
 });

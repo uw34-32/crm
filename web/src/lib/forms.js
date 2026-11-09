@@ -53,3 +53,14 @@ export function safeNext(next) {
   if (path === '/login' || path === '/register') return fallback;
   return next;
 }
+
+/**
+ * The API writes its messages as lowercase phrases; on screen they read as sentences.
+ * @param {string} message
+ */
+export function toSentence(message) {
+  const text = message.trim();
+  if (!text) return '';
+  const capitalized = text[0].toUpperCase() + text.slice(1);
+  return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
+}

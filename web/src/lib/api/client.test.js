@@ -39,11 +39,11 @@ function fakeApi() {
   const calls = [];
   /** @type {Record<string, (call: { method: string, path: string, auth: string | null, body: unknown }) => Response | Promise<Response>>} */
   const routes = {};
-  const fetch = vi.fn(async (/** @type {string} */ url, /** @type {RequestInit} */ init = {}) => {
+  const fetch = vi.fn(async (/** @type {RequestInfo | URL} */ url, /** @type {RequestInit} */ init = {}) => {
     const headers = new Headers(init.headers);
     const call = {
       method: init.method ?? 'GET',
-      path: url.slice(BASE.length),
+      path: String(url).slice(BASE.length),
       auth: headers.get('Authorization'),
       body: init.body ? JSON.parse(String(init.body)) : undefined
     };
