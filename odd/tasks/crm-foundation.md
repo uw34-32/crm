@@ -49,7 +49,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T1 Backend skeleton.** Go module, config, migrations runner, server entry point, health route, Compose, `dev.sh`, `.env.example`, README. Accept: server boots against Compose Postgres, applies migrations, `GET /health` returns 200. Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
 - [x] **T2 Auth.** Users, bcrypt, access JWT, refresh token rotation with family revocation. Accept: full auth flow and reuse detection covered by tests. Checks: `go test ./...`.
 - [x] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
-- [ ] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
+- [x] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
 - [ ] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
 - [ ] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
 - [ ] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
@@ -69,7 +69,11 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | Auth hardening and T3 | `1ebd9c1`, `e68532a`, `7df96db`, `9d626bc` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review declined by the owner for this candidate; independent verifier passed |
 
-Next assessment base: `5eee932`, the `main` commit pushed on 2026-11-09. The T3 range has no review receipt, because the owner declined it.
+| T4 | `0a7f57a`, `328803a`, `75ef363`, `847bfd6` | build, vet, gofmt clean; 510 test passes as `crm_app`, parent re-ran `go test`; CRUD, search, and cross-workspace 404 observed over HTTP | medium, granted; one correction for a critical `PATCH` null finding; validated, approved and acknowledged |
+
+`main` was pushed at `5eee932` on 2026-11-09. The T3 range has no review receipt, because the owner declined it. Last reviewed boundary: `847bfd6`.
+
+T4 decisions: soft-deleting a company clears its contacts' links; every member can read and write contacts and companies; a `PATCH` with an empty string clears an optional field, `null` on a text field returns 400, and `company_id: null` unlinks; a `POST` still treats a null optional field as blank; `limit` is 1 to 200 with no totals; search has no trigram index because `ILIKE` is not leakproof under Row-Level Security, so very large workspaces will need another design.
 
 ### Open items
 
@@ -80,4 +84,4 @@ Next assessment base: `5eee932`, the `main` commit pushed on 2026-11-09. The T3 
 
 ## Next step
 
-T4 in progress through one delegated writer on `feat/crm-contacts-companies`. `origin` uses SSH on port 443 because port 22 times out.
+Deliver T4 as the owner decides, then start T5. `origin` uses SSH on port 443 because port 22 times out.
