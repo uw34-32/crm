@@ -280,10 +280,6 @@ func (a *App) moveDeal(w http.ResponseWriter, r *http.Request) {
 		problem = "stage_id is required"
 	case req.Position.Value != nil && *req.Position.Value < 0:
 		problem = "position must not be negative"
-	// Sent but blank or null is not the same as left out: only a lost stage takes a
-	// reason, and a blank one is no reason.
-	case req.LostReason.Set && reason == "":
-		problem = "lost_reason must not be blank or null; leave it out unless the deal moves into a lost stage"
 	case hasNUL(reason):
 		problem = msgInvalidBody
 	case utf8.RuneCountInString(reason) > maxLostReasonRunes:
@@ -295,7 +291,14 @@ func (a *App) moveDeal(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := a.dbContext(r)
 	defer cancel()
-	deal, err := a.store.MoveDeal(ctx, workspace.ID, chi.URLParam(r, dealParam), model.DealMove{
+	// Sent but blank or null is not the same as left out, and only the target stage's
+	// kind, which the store reads under the pipeline lock, says what it means: an open
+	// or won stage refuses any reason, and a lost stage reads a blank one as none.
+	moveDeal := a.store.MoveDeal
+	if req.LostReason.Set {
+		moveDeal = a.store.MoveDealNamingReason
+	}
+	deal, err := moveDeal(ctx, workspace.ID, chi.URLParam(r, dealParam), model.DealMove{
 		StageID: *req.StageID.Value, Position: req.Position.intValue(), LostReason: reason,
 	})
 	if err != nil {

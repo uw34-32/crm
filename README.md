@@ -189,8 +189,8 @@ A move puts a deal at a position in a stage of its own pipeline, and every membe
 | --- | --- | --- |
 | `open` | Cleared | Cleared; a 400 if one is sent, even blank or `null` |
 | `won` | Set to now | Cleared; a 400 if one is sent, even blank or `null` |
-| `lost` | Set to now | Required, or a 400 |
-| The stage it is already in | Unchanged | Unchanged, unless a lost stage is given a new one |
+| `lost` | Set to now | Required, or a 400; blank or `null` counts as none |
+| The stage it is already in | Unchanged | Unchanged, unless a lost stage is given a new one; blank or `null` keeps it |
 
 `position` is a dense index, 0, 1, 2, ... among a stage's live deals, and the same goes for stages in a pipeline. So a client can use it directly as the place on the board, and a move names where it wants the deal, not how to compute a key between two neighbours. The cost is that a move rewrites the neighbours it shifts, which also moves their `updated_at` so that a later sync sees the new order.
 
@@ -207,7 +207,7 @@ An activity is a `note`, `call`, `meeting`, or `task` about a contact, a company
 | `kind` | Required on create; it never changes, so a `PATCH` that sends it gets a 400 |
 | `subject` | Required; 200 characters |
 | `body` | 10000 characters; empty by default |
-| `due_at` | A task only. RFC 3339 with a zone, such as `2027-03-14T09:30:00Z`, from 1900 to 2200 in UTC |
+| `due_at` | A task only. RFC 3339 with a zone, such as `2027-03-14T09:30:00Z`, from `1900-01-01T00:00:00Z` to `2200-12-31T23:59:59Z`. Digits beyond microseconds are dropped before the check, as the database would drop them |
 | `assignee_id` | A task only. A current member of the workspace |
 | `completed_at` | A task only, and only through `complete` and `reopen`; a body that sends it gets a 400 |
 | `author_id` | The member who created the activity; a body that sends it gets a 400 |

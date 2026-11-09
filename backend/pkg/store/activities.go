@@ -21,6 +21,9 @@ var (
 	// ErrNotATask means a due time, an assignee, or a completed state was aimed at a
 	// note, call, or meeting.
 	ErrNotATask = errors.New("only a task has a due time, an assignee, or a completed state")
+	// ErrDueOutOfRange means a due time outside the years the schema accepts, 1900 to
+	// 2200 in UTC. The API refuses one before it gets here.
+	ErrDueOutOfRange = errors.New("the due time is out of range")
 	// ErrActivityForbidden means the actor may read the activity but not change it:
 	// only its author or an owner or admin may.
 	ErrActivityForbidden = errors.New("only the author or an owner or admin may change this activity")
@@ -30,6 +33,7 @@ var (
 const (
 	activityNeedsLinkCheck  = "activities_needs_a_link"
 	activityTaskFieldsCheck = "activities_task_fields"
+	activityDueRangeCheck   = "activities_due_at_check"
 	pgCheckViolation        = "23514"
 )
 
@@ -44,6 +48,8 @@ func activityWriteError(op string, err error) error {
 			return ErrActivityNeedsLink
 		case activityTaskFieldsCheck:
 			return ErrNotATask
+		case activityDueRangeCheck:
+			return ErrDueOutOfRange
 		}
 	}
 	return fmt.Errorf("%s: %w", op, err)

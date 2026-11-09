@@ -47,7 +47,7 @@ func crmFailure(w http.ResponseWriter, op string, err error) {
 	case errors.Is(err, store.ErrLostReasonRequired):
 		errResp(w, http.StatusBadRequest, "a lost_reason is required to move a deal into a lost stage")
 	case errors.Is(err, store.ErrLostReasonNotAllowed):
-		errResp(w, http.StatusBadRequest, "only a lost stage takes a lost_reason")
+		errResp(w, http.StatusBadRequest, "only a lost stage takes a lost_reason; leave it out, even blank or null, for an open or won stage")
 	case errors.Is(err, store.ErrPipelineHasDeals):
 		errResp(w, http.StatusConflict, "the pipeline still holds deals")
 	case errors.Is(err, store.ErrStageHasDeals):
@@ -62,6 +62,8 @@ func crmFailure(w http.ResponseWriter, op string, err error) {
 		errResp(w, http.StatusBadRequest, "an activity links to at least one contact, company, or deal")
 	case errors.Is(err, store.ErrNotATask):
 		errResp(w, http.StatusBadRequest, "only a task has a due time, an assignee, or a completed state")
+	case errors.Is(err, store.ErrDueOutOfRange):
+		errResp(w, http.StatusBadRequest, msgInvalidDue)
 	case errors.Is(err, store.ErrActivityForbidden):
 		errResp(w, http.StatusForbidden, "only the author or an owner or admin may change this activity")
 	case errors.Is(err, store.ErrStageOrderMismatch):

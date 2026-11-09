@@ -1103,3 +1103,38 @@ func TestDealSchemaRefusesBadReferences(t *testing.T) {
 		wantPgCode(t, "insert", err, "23505")
 	})
 }
+
+// What a move means for the closed state depends on the target stage's kind, and on
+// whether the request named a lost reason at all.
+func TestClosingOf(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		target     model.StageKind
+		sameStage  bool
+		named      bool
+		given      string
+		wantStamp  bool
+		wantReason string
+		wantErr    error
+	}{
+		{"into open", model.StageOpen, false, false, "", false, "", nil},
+		{"into won", model.StageWon, false, false, "", true, "", nil},
+		{"within won", model.StageWon, true, false, "", false, "", nil},
+		{"blank reason into open", model.StageOpen, false, true, "", false, "", ErrLostReasonNotAllowed},
+		{"blank reason within won", model.StageWon, true, true, "", false, "", ErrLostReasonNotAllowed},
+		{"reason into won", model.StageWon, false, true, "Late", false, "", ErrLostReasonNotAllowed},
+		{"into lost with a reason", model.StageLost, false, true, "Price", true, "Price", nil},
+		{"into lost without a reason", model.StageLost, false, false, "", false, "", ErrLostReasonRequired},
+		{"into lost with a blank reason", model.StageLost, false, true, "", false, "", ErrLostReasonRequired},
+		{"within lost, no reason", model.StageLost, true, false, "", false, "Old", nil},
+		{"within lost, blank reason", model.StageLost, true, true, "", false, "Old", nil},
+		{"within lost, new reason", model.StageLost, true, true, "New", false, "New", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stamp, reason, err := closingOf(tt.target, tt.sameStage, tt.named, "Old", tt.given)
+			if !errors.Is(err, tt.wantErr) || (err == nil && (stamp != tt.wantStamp || reason != tt.wantReason)) {
+				t.Errorf("closingOf = %v, %q, %v; want %v, %q, %v", stamp, reason, err, tt.wantStamp, tt.wantReason, tt.wantErr)
+			}
+		})
+	}
+}

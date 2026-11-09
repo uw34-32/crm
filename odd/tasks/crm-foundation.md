@@ -108,4 +108,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 is done on `feat/crm-activities`; its delivery is the owner's decision. Next: fix the two T6 warnings, then T7, the first client. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 in progress on `feat/crm-web-shell` through one delegated writer, starting with the two T6 warnings. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.

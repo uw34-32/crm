@@ -176,6 +176,29 @@ func TestActivityKindAndLinkRules(t *testing.T) {
 	}
 }
 
+// The schema's bounds on a due time are an error of their own, not a failed write,
+// for any caller that did not check them first.
+func TestActivityDueOutOfRange(t *testing.T) {
+	b := newBoard(t)
+	ctx := context.Background()
+	contact := newContact(t, b.s, b.w.ID, "Ada", nil)
+	task := newActivity(t, b.s, b.w.ID, model.ActivityInput{Kind: model.ActivityTask, Subject: "x", AuthorID: b.owner.ID, ContactID: &contact.ID})
+	for _, due := range []time.Time{
+		time.Date(2200, 12, 31, 23, 59, 59, 500_000_000, time.UTC),
+		time.Date(1899, 12, 31, 23, 59, 59, 0, time.UTC),
+	} {
+		t.Run(due.Format(time.RFC3339Nano), func(t *testing.T) {
+			in := model.ActivityInput{Kind: model.ActivityTask, Subject: "x", AuthorID: b.owner.ID, ContactID: &contact.ID, DueAt: &due}
+			if _, err := b.s.CreateActivity(ctx, b.w.ID, in); !errors.Is(err, ErrDueOutOfRange) {
+				t.Errorf("create = %v", err)
+			}
+			if _, err := b.s.UpdateActivity(ctx, b.w.ID, b.owner.ID, task.ID, model.ActivityPatch{SetDue: true, DueAt: &due}); !errors.Is(err, ErrDueOutOfRange) {
+				t.Errorf("update = %v", err)
+			}
+		})
+	}
+}
+
 // A link must be live and in the workspace, and an assignee a current member. Anything
 // else is the same not-found error, whatever the reason.
 func TestActivityRefusesUnavailableLinks(t *testing.T) {

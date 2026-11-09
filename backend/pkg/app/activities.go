@@ -17,8 +17,6 @@ const (
 
 	maxActivitySubjectRunes = 200
 	maxActivityBodyRunes    = 10_000
-	minDueYear              = 1900
-	maxDueYear              = 2200
 
 	msgInvalidSubject        = "a subject of at most 200 characters is required"
 	msgInvalidActivityBody   = "body must be at most 10000 characters"
@@ -48,15 +46,23 @@ type activityRequest struct {
 	due *time.Time
 }
 
-// parseDue reads a time with a zone, within the years the schema accepts. The years
-// are checked in UTC, as the schema checks them.
+// The bounds of the schema's check on activities.due_at, in 011_activities.sql.
+var (
+	minDue = time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)
+	maxDue = time.Date(2200, time.December, 31, 23, 59, 59, 0, time.UTC)
+)
+
+// parseDue reads a time with a zone, within the bounds the schema accepts. The schema
+// keeps microseconds, and the driver drops any finer digits, so they are dropped here
+// first: the time checked is the time stored, and a fraction of the last second of
+// 2200 is refused here rather than by the database.
 func parseDue(raw string) (time.Time, bool) {
 	parsed, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
 		return time.Time{}, false
 	}
-	year := parsed.UTC().Year()
-	return parsed, year >= minDueYear && year <= maxDueYear
+	parsed = parsed.Truncate(time.Microsecond)
+	return parsed, !parsed.Before(minDue) && !parsed.After(maxDue)
 }
 
 // normalize trims and checks the fields that are present, and returns what is wrong

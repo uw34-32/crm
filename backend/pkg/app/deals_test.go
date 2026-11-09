@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +30,18 @@ type dealBody struct {
 }
 
 func dealsPath(workspaceID string) string { return "/workspaces/" + workspaceID + "/deals" }
+
+// errorMessage reads the message of an error response.
+func errorMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var body struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body %q is not JSON: %v", rec.Body, err)
+	}
+	return body.Error
+}
 
 func postDeal(t *testing.T, h http.Handler, token, workspaceID, pipelineID string, fields map[string]any) dealBody {
 	t.Helper()
@@ -222,9 +235,33 @@ func TestMoveDealOverHTTP(t *testing.T) {
 			t.Errorf("into lost, %s = %d, want 400", tt.name, code)
 		}
 	}
+	rec := call(t, h, http.MethodPost, path, member.Token, map[string]any{"stage_id": lost.ID, "lost_reason": ""})
+	wantStatus(t, rec, http.StatusBadRequest, "into lost, empty reason")
+	if msg := errorMessage(t, rec); !strings.Contains(msg, "required") {
+		t.Errorf("into lost, empty reason says %q, want the lost-stage rule", msg)
+	}
 	code, got = move(map[string]any{"stage_id": lost.ID, "lost_reason": " Too expensive "})
 	if code != http.StatusOK || got.Status != "lost" || got.ClosedAt == nil || got.LostReason != "Too expensive" {
 		t.Errorf("into lost = %d, %+v", code, got)
+	}
+	// Within the lost stage it is already in, a blank or null reason is no new reason:
+	// the deal keeps the one it has, and its closing time.
+	for _, tt := range []struct {
+		name string
+		body map[string]any
+	}{
+		{"no reason", map[string]any{"stage_id": lost.ID, "position": 0}},
+		{"blank reason", map[string]any{"stage_id": lost.ID, "position": 0, "lost_reason": "  "}},
+		{"null reason", map[string]any{"stage_id": lost.ID, "position": 0, "lost_reason": nil}},
+	} {
+		code, again := move(tt.body)
+		if code != http.StatusOK || again.LostReason != "Too expensive" || again.ClosedAt == nil || *again.ClosedAt != *got.ClosedAt {
+			t.Errorf("within lost, %s = %d, %+v", tt.name, code, again)
+		}
+	}
+	code, got = move(map[string]any{"stage_id": lost.ID, "lost_reason": "Went quiet"})
+	if code != http.StatusOK || got.LostReason != "Went quiet" {
+		t.Errorf("within lost, new reason = %d, %+v", code, got)
 	}
 
 	code, got = move(map[string]any{"stage_id": p.Stages[1].ID})

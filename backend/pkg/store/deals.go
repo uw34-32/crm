@@ -355,8 +355,10 @@ func lockDealPipeline(ctx context.Context, q Querier, workspaceID, id string) (s
 
 // closingOf works out what a move means for the deal's closed state, or refuses it.
 // A move within the stage is not a change of state, so it keeps the closing time, and
-// the lost reason unless a new one is given.
-func closingOf(target model.StageKind, sameStage bool, currentReason, givenReason string) (stamp bool, reason string, err error) {
+// the lost reason unless a new one is given. reasonNamed says the request named a lost
+// reason at all: an open or won stage refuses one even blank, while a lost stage reads a
+// blank one as none.
+func closingOf(target model.StageKind, sameStage, reasonNamed bool, currentReason, givenReason string) (stamp bool, reason string, err error) {
 	switch target {
 	case model.StageLost:
 		switch {
@@ -368,7 +370,7 @@ func closingOf(target model.StageKind, sameStage bool, currentReason, givenReaso
 			return false, "", ErrLostReasonRequired
 		}
 	case model.StageWon, model.StageOpen:
-		if givenReason != "" {
+		if reasonNamed || givenReason != "" {
 			return false, "", ErrLostReasonNotAllowed
 		}
 		return target == model.StageWon && !sameStage, "", nil
@@ -383,8 +385,20 @@ func closingOf(target model.StageKind, sameStage bool, currentReason, givenReaso
 // one at a time, each on what the previous one left. Positions stay dense: neighbours
 // shift by one, and the constraint on them would refuse anything else.
 //
-// A stage of another pipeline is ErrStageNotFound.
+// A stage of another pipeline is ErrStageNotFound. A blank LostReason counts as none.
 func (s *Store) MoveDeal(ctx context.Context, workspaceID, id string, move model.DealMove) (model.Deal, error) {
+	return s.moveDeal(ctx, workspaceID, id, move, false)
+}
+
+// MoveDealNamingReason is MoveDeal for a request that named a lost reason, even blank
+// or null. An open or won stage refuses it with ErrLostReasonNotAllowed, as it refuses
+// any reason. A lost stage reads a blank one as none: entering it still needs a reason,
+// and a move within it keeps the one the deal has.
+func (s *Store) MoveDealNamingReason(ctx context.Context, workspaceID, id string, move model.DealMove) (model.Deal, error) {
+	return s.moveDeal(ctx, workspaceID, id, move, true)
+}
+
+func (s *Store) moveDeal(ctx context.Context, workspaceID, id string, move model.DealMove, reasonNamed bool) (model.Deal, error) {
 	if !validUUID(id) {
 		return model.Deal{}, ErrDealNotFound
 	}
@@ -411,7 +425,7 @@ func (s *Store) MoveDeal(ctx context.Context, workspaceID, id string, move model
 			return err
 		}
 		sameStage := strings.EqualFold(move.StageID, currentStage)
-		stamp, reason, err := closingOf(target, sameStage, currentReason, move.LostReason)
+		stamp, reason, err := closingOf(target, sameStage, reasonNamed, currentReason, move.LostReason)
 		if err != nil {
 			return err
 		}
