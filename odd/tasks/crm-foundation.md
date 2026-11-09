@@ -50,7 +50,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T2 Auth.** Users, bcrypt, access JWT, refresh token rotation with family revocation. Accept: full auth flow and reuse detection covered by tests. Checks: `go test ./...`.
 - [x] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
 - [x] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
-- [ ] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
+- [x] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
 - [ ] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
 - [ ] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
 - [ ] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
@@ -73,6 +73,19 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 `main` was pushed at `5eee932` on 2026-11-09. The T3 range has no review receipt, because the owner declined it. Last reviewed boundary: `847bfd6`.
 
+| T5 | `bce3adf`, `7df945d`, `31e2d68`, `3dc98bc` | build, vet, gofmt clean; 783 test passes as `crm_app`, parent re-ran `go test`; default pipeline, deal moves, and cross-workspace 404 observed over HTTP | medium; one review of the whole range exceeded the reviewer context budget, so each commit was reviewed separately with owner consent: 4 of 4 approved and acknowledged |
+
+T5 decisions: stages soft-delete with `position` NULL; dense integer positions serialized on the pipeline row lock, with last-wins moves and no version check; a removed member's deals keep no owner and do not regain one on rejoin; deleting a pipeline or stage with live deals returns 409; deals start only in an open stage; value is integer minor units; migration 009 refuses a role that cannot bypass Row-Level Security.
+
+T5 review warnings, none blocking and not yet fixed:
+
+- `DeletePipeline` can delete a workspace's last pipeline, leaving nowhere to create deals (`backend/pkg/store/pipelines.go:215-230`). Product decision for the owner.
+- A blank `lost_reason` sent to an open or won stage returns 200, while the README says 400 (`backend/pkg/app/deals.go:276`).
+- A blank line splits the README route table, so new rows render as plain text (`README.md:106`).
+- `TestConcurrentStageWritesKeepPositionsDense` does not race reorder or delete (`backend/pkg/store/pipelines_test.go:579-590`).
+- `TestUnlinkingStaysInsideTheWorkspace` probably stays green without the `workspace_id` filter in `unlinkDeals` (`backend/pkg/store/deal_links_test.go:417-444`).
+- Contacts and companies still accept invalid UTF-8 through `decodeJSON`, unlike pipelines and deals.
+
 T4 decisions: soft-deleting a company clears its contacts' links; every member can read and write contacts and companies; a `PATCH` with an empty string clears an optional field, `null` on a text field returns 400, and `company_id: null` unlinks; a `POST` still treats a null optional field as blank; `limit` is 1 to 200 with no totals; search has no trigram index because `ILIKE` is not leakproof under Row-Level Security, so very large workspaces will need another design.
 
 ### Open items
@@ -84,4 +97,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 in progress through one delegated writer on `feat/crm-pipelines-deals`; its delivery is the owner's decision. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 is done on `feat/crm-pipelines-deals`; its delivery is the owner's decision. Next: T6. `origin` uses SSH on port 443 because port 22 times out.
