@@ -1,6 +1,6 @@
 # CRM
 
-A team CRM. This repository currently holds the backend foundation: configuration, migrations, database roles, a health route, and accounts with token auth. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository currently holds the backend foundation: configuration, migrations, database roles, a health route, accounts with token auth, and workspaces with members and Row-Level Security. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
@@ -45,7 +45,7 @@ Settings come from the environment. `dev.sh` also reads an optional `.env` in th
 | `REFRESH_TOKEN_TTL` | `720h` | The server's built-in default; each rotation issues a token with a fresh lifetime |
 | `REFRESH_GRACE` | `10s` | The server's built-in default; `0s` disables retries of a spent token |
 | `AUTH_RATE_LIMIT_PER_MINUTE` | `30` | The server's built-in default; per client, on `/auth/register` and `/auth/login`; must be positive |
-| `AUTH_SESSION_RATE_LIMIT_PER_MINUTE` | `600` | The server's built-in default; per client, on every other limited route; must be positive |
+| `AUTH_SESSION_RATE_LIMIT_PER_MINUTE` | `600` | The server's built-in default; per client, on session and workspace routes; must be positive |
 | `CORS_ORIGINS` | SvelteKit, Expo web, and Tauri local origins | Comma-separated exact origins; none by default in the server; wildcards are refused |
 | `TRUSTED_PROXIES` | none | Comma-separated addresses or CIDR prefixes; forwarding headers are ignored unless the peer is listed |
 | `POSTGRES_PASSWORD` | `postgres` | Local only; applied when the volume is first created |
@@ -64,7 +64,7 @@ Two roles keep Row-Level Security meaningful:
 | Migration owner (`postgres` in Compose) | Migrations, through `MIGRATION_DATABASE_URL` | Owns the schema and every table |
 | `crm_app` | The server's queries, through `DATABASE_URL` | `NOSUPERUSER NOBYPASSRLS`, owns nothing, has data access only |
 
-At startup the server reads the role behind `DATABASE_URL` and refuses to boot if it is a superuser, has `BYPASSRLS`, or owns a table. The check runs before migrations, so a refused server changes nothing.
+At startup the server reads the role behind `DATABASE_URL` and refuses to boot if it is a superuser, has `BYPASSRLS`, or owns a table. The check runs before migrations, so a refused server changes nothing. After migrations it also checks every workspace-scoped table; see [Tenancy](#tenancy).
 
 `crm_app` needs a password, so no migration creates it. `scripts/bootstrap-db-roles.sh` creates or updates it in the Compose database; it is safe to rerun and works on an existing volume. Migrations fail with a clear error if the role is missing. Elsewhere, create the role yourself with the same attributes before the first boot.
 
@@ -82,6 +82,18 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `POST /auth/refresh` | `refresh_token` | 200 with `token`, `refresh_token`, `user` | 401 for any invalid token |
 | `POST /auth/logout` | `refresh_token` | 204 | Also 204 for an unknown token |
 | `GET /auth/me` | | 200 with the user | Needs `Authorization: Bearer <token>` |
+| `POST /workspaces` | `name` | 201 with the workspace | The creator becomes its owner |
+| `GET /workspaces` | | 200 with the caller's workspaces and role in each | |
+| `GET /workspaces/{id}` | | 200 with the workspace and the caller's role | |
+| `PATCH /workspaces/{id}` | `name` | 200 with the workspace | Owner or admin |
+| `DELETE /workspaces/{id}` | | 204 | Owner; a soft delete |
+| `POST /workspaces/{id}/leave` | | 204 | 409 for the last owner |
+| `GET /workspaces/{id}/members` | | 200 with the members | Any member |
+| `POST /workspaces/{id}/members` | `email`, `role` | 201 with the member | Owner or admin; 404 for an unknown email, 409 for an existing member |
+| `PATCH /workspaces/{id}/members/{userID}` | `role` | 200 with the member | Owner or admin; 409 for the last owner |
+| `DELETE /workspaces/{id}/members/{userID}` | | 204 | Owner or admin; 409 for the last owner |
+
+Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin`, and `member`.
 
 Passwords are 8 to 72 bytes, the limit of bcrypt.
 
@@ -95,7 +107,7 @@ The exception is a retry within `REFRESH_GRACE` of the rotation, for a lost resp
 
 ### Rate limit and proxies
 
-Two budgets per client, refilled continuously, answer 429 with `Retry-After` when spent. `/auth/register` and `/auth/login` share `AUTH_RATE_LIMIT_PER_MINUTE`, which protects bcrypt. `/auth/refresh`, `/auth/logout`, and `/auth/me` share the far larger `AUTH_SESSION_RATE_LIMIT_PER_MINUTE`, because a whole team can sit behind one address. A client is an IPv4 address or an IPv6 /64. Limits live in the memory of one server process, so several processes would each grant the full budget.
+Budgets are per client and refill continuously, and a spent one answers 429 with `Retry-After`. `/auth/register` and `/auth/login` share `AUTH_RATE_LIMIT_PER_MINUTE`, which protects bcrypt. `/auth/refresh`, `/auth/logout`, and `/auth/me` share the far larger `AUTH_SESSION_RATE_LIMIT_PER_MINUTE`, because a whole team can sit behind one address. `/workspaces` has its own bucket of that same size, so a busy screen cannot starve the refresh that keeps it signed in. Adding a member spends a further bucket the size of `AUTH_RATE_LIMIT_PER_MINUTE`, because its answer reveals whether an email has an account. A client is an IPv4 address or an IPv6 /64. Limits live in the memory of one server process, so several processes would each grant the full budget.
 
 The limiter tracks at most 100,000 clients. Beyond that, a client falls into a fixed table of overflow buckets, chosen by a seeded hash of its IPv4 /24 or IPv6 /32. Filling the map from one block therefore drains only that block's bucket, not everyone's. A client in the attacker's block still shares its budget while the map is full, and an attacker spread over very many blocks can drain most of the table; a limit in front of the server is the answer to that.
 
@@ -106,6 +118,85 @@ bcrypt runs in at most as many slots as CPU cores, with a minimum of two. A requ
 A NUL character in any JSON string gets a 400.
 
 The client address is the connection's peer. Behind a reverse proxy, list it in `TRUSTED_PROXIES`, or every client shares the proxy's budget; `X-Forwarded-For` and `X-Forwarded-Proto` are read only from listed peers.
+
+## Tenancy
+
+A workspace is the tenant boundary. A user can belong to many, with one role in each:
+
+| Action | `owner` | `admin` | `member` |
+| --- | --- | --- | --- |
+| Read the workspace and its members; leave | yes | yes | yes |
+| Rename the workspace | yes | yes | no |
+| Add, change, or remove `admin` and `member` | yes | yes | no |
+| Make, change, or remove an `owner` | yes | no | no |
+| Delete the workspace | yes | no | no |
+
+A workspace always keeps at least one owner. Every change to a workspace or its members first takes that workspace's row lock and re-reads the actor's role, so concurrent changes cannot remove the last owner, and a role that changed after the middleware ran is not trusted.
+
+The membership middleware (`requireWorkspace`) resolves the workspace from the route and places the workspace and role in the request context. Any failure ends the request. A non-member, a nonexistent workspace, a deleted workspace, and a malformed ID all get the same 404 with an identical body.
+
+### Row-Level Security
+
+Isolation has two layers. Store queries filter on `workspace_id` explicitly, and PostgreSQL policies enforce the same boundary if a filter is ever forgotten. The policies read two transaction-local settings. Unset or empty means NULL, which matches nothing, so they fail closed.
+
+| Setting | Grants | Set by | Used for |
+| --- | --- | --- | --- |
+| `app.workspace_id` | Full access to one workspace | `Store.InWorkspace` | Everything inside a workspace, after the middleware has confirmed membership |
+| `app.user_id` | Read-only: the caller's own membership rows, and the workspaces they belong to | The store, internally | The two lookups that happen before a workspace is known: the membership check and listing workspaces |
+
+`app.user_id` solves the chicken-and-egg problem without `SECURITY DEFINER` functions: it cannot reveal fellow members or allow any write. The `workspace_members` policy compares a column and never queries its own table, so it cannot recurse. Creating a workspace generates the ID first and sets it as `app.workspace_id`, so both inserts pass the policies in one transaction. A fresh ID cannot name another tenant's workspace.
+
+The migration owner is a superuser in Compose, and superusers always bypass Row-Level Security, so migrations are unaffected even with `FORCE`. A non-superuser owner would be bound by `FORCE` and need `BYPASSRLS` for data migrations.
+
+Row-Level Security here defends against store bugs, not against SQL injection: code that can run arbitrary SQL as `crm_app` can also call `set_config`. It also does not enforce the soft delete, which is the store's and the middleware's job.
+
+### Adding a workspace-scoped table
+
+1. Give it `workspace_id UUID NOT NULL` and `updated_at TIMESTAMPTZ NOT NULL`. Use `deleted_at` for business data.
+2. Enable and force Row-Level Security, with a `FOR ALL` policy with both `USING` and `WITH CHECK`:
+
+   ```sql
+   ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE contacts FORCE ROW LEVEL SECURITY;
+   CREATE POLICY contacts_tenant ON contacts FOR ALL
+       USING (workspace_id = NULLIF(current_setting('app.workspace_id', true), '')::uuid)
+       WITH CHECK (workspace_id = NULLIF(current_setting('app.workspace_id', true), '')::uuid);
+   ```
+
+3. Reference other tenant tables with a composite foreign key. Foreign key checks bypass Row-Level Security, so a plain `contact_id` would accept a contact from another workspace:
+
+   ```sql
+   CREATE TABLE contacts (
+       id           UUID NOT NULL DEFAULT gen_random_uuid(),
+       workspace_id UUID NOT NULL REFERENCES workspaces (id),
+       -- ...
+       PRIMARY KEY (id),
+       UNIQUE (workspace_id, id)
+   );
+   CREATE TABLE deals (
+       -- ...
+       workspace_id UUID NOT NULL,
+       contact_id   UUID NOT NULL,
+       assigned_to  UUID NOT NULL,
+       FOREIGN KEY (workspace_id, contact_id) REFERENCES contacts (workspace_id, id),
+       FOREIGN KEY (workspace_id, assigned_to) REFERENCES workspace_members (workspace_id, user_id)
+   );
+   ```
+
+4. Run every query through `Store.InWorkspace`, and still filter on `workspace_id`. Take the ID from the workspace in the request context, never from a token claim or a request field:
+
+   ```go
+   func (s *Store) ListContacts(ctx context.Context, workspaceID string) ([]model.Contact, error) {
+       var contacts []model.Contact
+       err := s.InWorkspace(ctx, workspaceID, func(q Querier) error {
+           rows, err := q.Query(ctx, `SELECT ... FROM contacts WHERE workspace_id = $1::text::uuid`, workspaceID)
+           // ...
+       })
+       return contacts, err
+   }
+   ```
+
+Any table with a `workspace_id` column is checked at server startup and by `TestTenantTablesAreProtected`: Row-Level Security enabled and forced, a non-nullable tenant column, `updated_at`, and a `FOR ALL` policy with `USING` and `WITH CHECK`, with no `USING (true)`. A table that fails stops the server. Never set `app.workspace_id` with session scope or outside a transaction: on a pooled connection it would carry over to the next request.
 
 ## Test
 
@@ -121,7 +212,7 @@ TEST_MIGRATION_DATABASE_URL='postgres://postgres:postgres@localhost:5435/crm_tes
 go test -race ./...
 ```
 
-Migration tests run in throwaway schemas and drop them afterwards. Other database-backed tests migrate the `public` schema of `crm_test`.
+Migration tests run in throwaway schemas and drop them afterwards. Other database-backed tests migrate the `public` schema of `crm_test`. Isolation tests connect as `crm_app` and run raw SQL with no tenant filter, so they prove the policies independently of the store.
 
 ## Migrations
 

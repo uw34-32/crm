@@ -29,23 +29,26 @@ const (
 )
 
 type App struct {
-	store         *store.Store
-	tokens        *auth.Manager
-	passwords     *auth.Passwords
-	passwordLimit *ipLimiter
-	sessionLimit  *ipLimiter
-	healthTimeout time.Duration
-	passwordCost  int
-	refreshTTL    time.Duration
-	refreshGrace  time.Duration
-	rateLimit     int
-	corsOrigins   []string
-	trust         proxyTrust
+	store             *store.Store
+	tokens            *auth.Manager
+	passwords         *auth.Passwords
+	passwordLimit     *ipLimiter
+	sessionLimit      *ipLimiter
+	workspaceLimit    *ipLimiter
+	memberLookupLimit *ipLimiter
+	healthTimeout     time.Duration
+	passwordCost      int
+	refreshTTL        time.Duration
+	refreshGrace      time.Duration
+	rateLimit         int
+	corsOrigins       []string
+	trust             proxyTrust
 
-	sessionRateLimit int
-	dbTimeout        time.Duration
-	passwordSlots    chan struct{}
-	passwordWait     time.Duration
+	sessionRateLimit      int
+	memberLookupRateLimit int
+	dbTimeout             time.Duration
+	passwordSlots         chan struct{}
+	passwordWait          time.Duration
 }
 
 type Option func(*App)
@@ -83,6 +86,13 @@ func WithAuthRateLimit(perMinute int) Option {
 // that need no password work.
 func WithSessionRateLimit(perMinute int) Option {
 	return func(a *App) { a.sessionRateLimit = perMinute }
+}
+
+// WithMemberLookupRateLimit sets the per-client budget per minute for adding a
+// member, which reveals whether an email has an account. It defaults to the
+// password route budget.
+func WithMemberLookupRateLimit(perMinute int) Option {
+	return func(a *App) { a.memberLookupRateLimit = perMinute }
 }
 
 // WithDBTimeout bounds each database step of a request.
@@ -137,6 +147,13 @@ func New(s *store.Store, tokens *auth.Manager, opts ...Option) *App {
 	app.passwords = passwords
 	app.passwordLimit = newIPLimiter(app.rateLimit, limiterMaxEntries, time.Now)
 	app.sessionLimit = newIPLimiter(app.sessionRateLimit, limiterMaxEntries, time.Now)
+	// Same size as the session budget but a separate bucket, so a busy screen
+	// cannot starve the token refresh that keeps it signed in.
+	app.workspaceLimit = newIPLimiter(app.sessionRateLimit, limiterMaxEntries, time.Now)
+	if app.memberLookupRateLimit == 0 {
+		app.memberLookupRateLimit = app.rateLimit
+	}
+	app.memberLookupLimit = newIPLimiter(app.memberLookupRateLimit, limiterMaxEntries, time.Now)
 	return app
 }
 
@@ -159,6 +176,23 @@ func (a *App) Handler() http.Handler {
 			r.Post("/refresh", a.refresh)
 			r.Post("/logout", a.logout)
 			r.With(a.requireAuth).Get("/me", a.me)
+		})
+	})
+
+	r.Route("/workspaces", func(r chi.Router) {
+		r.Use(rateLimit(a.workspaceLimit, a.trust), a.requireAuth)
+		r.Post("/", a.createWorkspace)
+		r.Get("/", a.listWorkspaces)
+		r.Route("/{"+workspaceParam+"}", func(r chi.Router) {
+			r.Use(a.requireWorkspace)
+			r.Get("/", a.getWorkspace)
+			r.Patch("/", a.renameWorkspace)
+			r.Delete("/", a.deleteWorkspace)
+			r.Post("/leave", a.leaveWorkspace)
+			r.Get("/members", a.listMembers)
+			r.With(rateLimit(a.memberLookupLimit, a.trust)).Post("/members", a.addMember)
+			r.Patch("/members/{"+memberParam+"}", a.changeMemberRole)
+			r.Delete("/members/{"+memberParam+"}", a.removeMember)
 		})
 	})
 

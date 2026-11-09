@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"testing"
@@ -240,6 +242,53 @@ func TestMigrationsAreNotBoundByStartupDeadline(t *testing.T) {
 }
 
 // Refusal comes before migrations, so a misconfigured server changes nothing.
+// A workspace-scoped table without its policies must stop the server. The table
+// lives in a throwaway schema, chosen through the connection's search_path, so
+// other tests against the public schema never see it.
+func TestNewRefusesUnprotectedTenantTable(t *testing.T) {
+	appURL, ownerURL := testdb.URLs(t)
+	ctx := context.Background()
+	owner, err := pgx.Connect(ctx, ownerURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close(ctx)
+
+	schema := fmt.Sprintf("test_rls_%d", time.Now().UnixNano())
+	if _, err := owner.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := owner.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE"); err != nil {
+			t.Errorf("drop schema: %v", err)
+		}
+	}()
+	if _, err := owner.Exec(ctx, "CREATE TABLE "+schema+".rogue (workspace_id UUID NOT NULL)"); err != nil {
+		t.Fatal(err)
+	}
+
+	inSchema := func(raw string) string {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := u.Query()
+		q.Set("search_path", schema)
+		u.RawQuery = q.Encode()
+		return u.String()
+	}
+	_, err = New(ctx, config.Config{
+		DatabaseURL:          inSchema(appURL),
+		MigrationDatabaseURL: inSchema(ownerURL),
+		Port:                 "0",
+		MigrationTimeout:     time.Minute,
+		JWTSecret:            testJWTSecret,
+	})
+	if !errors.Is(err, store.ErrUnprotectedTenantTable) {
+		t.Fatalf("New = %v, want ErrUnprotectedTenantTable", err)
+	}
+}
+
 func TestNewRefusesPrivilegedAppRole(t *testing.T) {
 	_, ownerURL := testdb.URLs(t)
 	holdMigrationLock(t, ownerURL)

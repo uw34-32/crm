@@ -32,8 +32,8 @@ type Server struct {
 	pool *pgxpool.Pool
 }
 
-// New verifies the app role, applies pending migrations as the owner, and
-// prepares the server. The caller owns the result and releases it by calling
+// New verifies the app role, applies pending migrations as the owner, verifies
+// Row-Level Security on workspace-scoped tables, and prepares the server. The caller owns the result and releases it by calling
 // Run.
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	tokens, err := auth.NewManager(cfg.JWTSecret, cfg.AccessTokenTTL)
@@ -88,6 +88,14 @@ func startup(ctx context.Context, cfg config.Config, pool *pgxpool.Pool) error {
 	defer owner.Close()
 	if err := migrate.Apply(migrateCtx, owner); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)
+	}
+
+	// After migrations, because they are what creates or fixes the tables. A
+	// table with a workspace_id that lacks its policies stops the server.
+	checkCtx, cancelCheck := context.WithTimeout(ctx, startupTimeout)
+	defer cancelCheck()
+	if _, err := store.New(pool).CheckTenantTables(checkCtx); err != nil {
+		return fmt.Errorf("check tenant tables: %w", err)
 	}
 	return nil
 }
