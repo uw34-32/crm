@@ -404,6 +404,47 @@ func TestContactInputValidation(t *testing.T) {
 	}
 }
 
+func TestUpdateTextFieldPresence(t *testing.T) {
+	h := authHandler(t)
+	owner := register(t, h, uniqueEmail(t))
+	base := "/workspaces/" + createWorkspace(t, h, owner.Token).ID
+	company := data[companyBody](t, call(t, h, http.MethodPost, base+"/companies", owner.Token, map[string]any{"name": "Acme", "phone": "1", "industry": "Tools"}))
+	contact := data[contactBody](t, call(t, h, http.MethodPost, base+"/contacts", owner.Token, map[string]any{"first_name": "Ann", "phone": "2", "title": "CEO", "company_id": company.ID}))
+	companyPath, contactPath := base+"/companies/"+company.ID, base+"/contacts/"+contact.ID
+
+	for path, fields := range map[string][]string{
+		companyPath: {"name", "domain", "phone", "industry", "address"},
+		contactPath: {"first_name", "last_name", "email", "phone", "title"},
+	} {
+		before := call(t, h, http.MethodGet, path, owner.Token, nil).Body.String()
+		for _, field := range fields {
+			withChange := map[string]any{"phone": "9", "title": "9", "address": "9"}
+			withChange[field] = nil
+			for _, body := range []map[string]any{{field: nil}, withChange} {
+				rec := call(t, h, http.MethodPatch, path, owner.Token, body)
+				wantStatus(t, rec, http.StatusBadRequest, field+" null")
+				if !strings.Contains(rec.Body.String(), field+" must not be null") {
+					t.Errorf("%s null: body = %s", field, rec.Body)
+				}
+			}
+		}
+		if after := call(t, h, http.MethodGet, path, owner.Token, nil).Body.String(); after != before {
+			t.Errorf("after refused updates = %s, want %s", after, before)
+		}
+	}
+
+	// An empty string clears a field, an omitted one stays, and a null company unlinks.
+	gotCompany := data[companyBody](t, call(t, h, http.MethodPatch, companyPath, owner.Token, map[string]any{"phone": ""}))
+	if gotCompany.Phone != "" || gotCompany.Industry != "Tools" {
+		t.Errorf("company after clearing phone = %+v", gotCompany)
+	}
+	gotContact := data[contactBody](t, call(t, h, http.MethodPatch, contactPath, owner.Token, map[string]any{"company_id": nil, "phone": ""}))
+	if gotContact.CompanyID != nil || gotContact.Phone != "" || gotContact.Title != "CEO" {
+		t.Errorf("contact after unlinking = %+v", gotContact)
+	}
+	wantStatus(t, call(t, h, http.MethodPost, base+"/contacts", owner.Token, map[string]any{"first_name": "Bo", "phone": nil}), http.StatusCreated, "create with a null phone")
+}
+
 // isolation holds two workspaces with a user each, and one company and one linked
 // contact in B that A's user tries to reach.
 type isolation struct {

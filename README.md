@@ -110,7 +110,7 @@ Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin
 
 Every member of a workspace, whatever their role, can read and write its contacts and companies.
 
-A contact or company that is in another workspace, soft-deleted, nonexistent, or named by a malformed ID gets the same 404 with an identical body. The same goes for a `company_id` in a request body: a contact can link only a live company in its own workspace. Anything else that is invalid gets a 400: text beyond its limit, a NUL character, or a `PATCH` with no fields. Text is trimmed, a `PATCH` changes only the fields it names, and an empty string clears an optional field.
+A contact or company that is in another workspace, soft-deleted, nonexistent, or named by a malformed ID gets the same 404 with an identical body. The same goes for a `company_id` in a request body: a contact can link only a live company in its own workspace. Anything else that is invalid gets a 400: text beyond its limit, a NUL character, a `PATCH` with no fields, or a `PATCH` that sets a text field to `null`. Text is trimmed, a `PATCH` changes only the fields it names, and an empty string clears an optional field.
 
 | Field | Limit |
 | --- | --- |

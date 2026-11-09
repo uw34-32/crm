@@ -155,14 +155,29 @@ func validDomain(domain string) bool {
 	return true
 }
 
-// optionalID tells a field that was left out from one sent as null: leaving out a
-// contact's company keeps the link, and null removes it.
-type optionalID struct {
+// optionalString tells a field that was left out from one sent as null: leaving out
+// a contact's company keeps the link, null removes it, and an update refuses null text.
+type optionalString struct {
 	Set   bool
 	Value *string
 }
 
-func (o *optionalID) UnmarshalJSON(raw []byte) error {
+func (o *optionalString) UnmarshalJSON(raw []byte) error {
 	o.Set = true
 	return json.Unmarshal(raw, &o.Value)
+}
+
+type namedText struct {
+	name  string
+	value optionalString
+}
+
+// nullProblem reports the first text field sent as null, if any.
+func nullProblem(fields []namedText) string {
+	for _, f := range fields {
+		if f.value.Set && f.value.Value == nil {
+			return f.name + " must not be null"
+		}
+	}
+	return ""
 }

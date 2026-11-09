@@ -16,32 +16,36 @@ const (
 )
 
 type companyRequest struct {
-	Name     *string `json:"name"`
-	Domain   *string `json:"domain"`
-	Phone    *string `json:"phone"`
-	Industry *string `json:"industry"`
-	Address  *string `json:"address"`
+	Name     optionalString `json:"name"`
+	Domain   optionalString `json:"domain"`
+	Phone    optionalString `json:"phone"`
+	Industry optionalString `json:"industry"`
+	Address  optionalString `json:"address"`
 }
 
 func (c *companyRequest) empty() bool {
-	return c.Name == nil && c.Domain == nil && c.Phone == nil && c.Industry == nil && c.Address == nil
+	return !c.Name.Set && !c.Domain.Set && !c.Phone.Set && !c.Industry.Set && !c.Address.Set
+}
+
+func (c *companyRequest) nullProblem() string {
+	return nullProblem([]namedText{{"name", c.Name}, {"domain", c.Domain}, {"phone", c.Phone}, {"industry", c.Industry}, {"address", c.Address}})
 }
 
 // normalize trims and checks the fields that are present, and returns what is
 // wrong with them, if anything.
 func (c *companyRequest) normalize() string {
 	switch {
-	case optionalNUL(c.Name, c.Domain, c.Phone, c.Industry, c.Address):
+	case optionalNUL(c.Name.Value, c.Domain.Value, c.Phone.Value, c.Industry.Value, c.Address.Value):
 		return msgInvalidBody
-	case !requiredFits(c.Name, maxNameRunes):
+	case !requiredFits(c.Name.Value, maxNameRunes):
 		return "a name of at most 200 characters is required"
-	case !validOptionalDomain(c.Domain):
+	case !validOptionalDomain(c.Domain.Value):
 		return "domain must be a host name such as example.com"
-	case !validOptionalPhone(c.Phone):
+	case !validOptionalPhone(c.Phone.Value):
 		return msgInvalidPhone
-	case !trimmedFits(c.Industry, maxIndustryRunes):
+	case !trimmedFits(c.Industry.Value, maxIndustryRunes):
 		return "industry must be at most 100 characters"
-	case !trimmedFits(c.Address, maxAddressRunes):
+	case !trimmedFits(c.Address.Value, maxAddressRunes):
 		return "address must be at most 500 characters"
 	}
 	return ""
@@ -95,14 +99,14 @@ func (a *App) createCompany(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if req.Name == nil {
+	if req.Name.Value == nil {
 		errResp(w, http.StatusBadRequest, "a name of at most 200 characters is required")
 		return
 	}
 	ctx, cancel := a.dbContext(r)
 	defer cancel()
 	company, err := a.store.CreateCompany(ctx, workspace.ID, model.CompanyInput{
-		Name: *req.Name, Domain: deref(req.Domain), Phone: deref(req.Phone), Industry: deref(req.Industry), Address: deref(req.Address),
+		Name: *req.Name.Value, Domain: deref(req.Domain.Value), Phone: deref(req.Phone.Value), Industry: deref(req.Industry.Value), Address: deref(req.Address.Value),
 	})
 	if err != nil {
 		crmFailure(w, "create company", err)
@@ -135,6 +139,10 @@ func (a *App) updateCompany(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if problem := req.nullProblem(); problem != "" {
+		errResp(w, http.StatusBadRequest, problem)
+		return
+	}
 	if req.empty() {
 		errResp(w, http.StatusBadRequest, msgNoFields)
 		return
@@ -142,7 +150,7 @@ func (a *App) updateCompany(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := a.dbContext(r)
 	defer cancel()
 	company, err := a.store.UpdateCompany(ctx, workspace.ID, chi.URLParam(r, companyParam), model.CompanyPatch{
-		Name: req.Name, Domain: req.Domain, Phone: req.Phone, Industry: req.Industry, Address: req.Address,
+		Name: req.Name.Value, Domain: req.Domain.Value, Phone: req.Phone.Value, Industry: req.Industry.Value, Address: req.Address.Value,
 	})
 	if err != nil {
 		crmFailure(w, "update company", err)
