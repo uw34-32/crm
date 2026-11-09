@@ -28,6 +28,7 @@ Out of scope for this feature: integration with `contacts`, email or calendar sy
 - **Architecture:** mirror `contacts`: `backend/cmd/server`, `backend/pkg/{app,auth,config,migrate,model,server,store}`, embedded SQL migrations, `web/` with SvelteKit 5, Tailwind 4, and adapter-static, `native-client/` with Expo and React Native, and Tauri in `native-client/src-tauri`. This is layered, not hexagonal: `App` depends on the concrete `*store.Store`.
 - **Stack:** Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, PostgreSQL 16 through Docker Compose.
 - **Tenancy:** every business table has `workspace_id`; every store method takes it; a membership middleware resolves the workspace from the route. A resource in another workspace returns 404, never 403, so existence does not leak.
+- **Row-Level Security as a second layer (user decision, 2026-11-08):** the `workspace_id` store filter stays the primary control. T2 splits database roles: a migration owner, and an app role that is neither superuser nor `BYPASSRLS`, with both flags checked at startup. T3 adds policies with `FORCE`, explicit `WITH CHECK`, a transaction-local `app.workspace_id` that fails closed, and composite foreign keys such as `(workspace_id, contact_id)`, because foreign key checks bypass RLS. Isolation tests connect as the app role. `dianisport-facturacion` is a list of mistakes to avoid here, not a template.
 - **Online only in v1 (user decision, 2026-11-08):** all clients call the API directly, with no local SQLite or sync endpoints. Business tables keep `updated_at` and soft delete so sync can be added later.
 - **Local ports:** must not clash with `contacts` (Postgres 5433) or `planner` (Postgres 5434, API 8080). Use Postgres 5435 and API 8085.
 - Generated artifacts, UI copy included, are in English.
@@ -61,7 +62,18 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | Task | Commit | Verification | Review tier and outcome |
 | --- | --- | --- | --- |
+| T1 (partial, open: `.env.example`) | `be73fb0`, `86c24c5`, `b33a61f` | build, vet, gofmt clean; 14/14 tests with database, parent re-ran `go test`; `/health` 200 and 503 observed; migrations idempotent | high, granted, approved and acknowledged |
+
+Reviewed boundary after T1: `b33a61f`.
+
+### T1 open items
+
+- `.env.example` is missing: the permission settings deny writing it. Needs the owner to allow the path or create the file.
+- Review warning R4: the 30-second startup deadline covers migrations, so a long migration could block boot (`backend/pkg/server/server.go:40-45`). Latent today.
+- Review warning R3-002: no test covers `server.New` plus `Run` serving `/health` against a real database (`backend/pkg/server/server_test.go:93-101`).
+- Suggestions, not scheduled: unused health timeout option, duplicated port default, and three minor reliability notes.
+- Middleware from `contacts` (CORS, rate limit, security headers) was not ported; T2 needs it for auth routes.
 
 ## Next step
 
-T1 in progress through one delegated writer.
+Close the T1 open items, then start T2. The tenancy decision on Row-Level Security is pending with the user before T3.

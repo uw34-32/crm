@@ -34,6 +34,7 @@ Settings come from the environment. `dev.sh` also reads an optional `.env` in th
 | --- | --- | --- |
 | `DATABASE_URL` | `postgres://postgres:postgres@localhost:5435/crm?sslmode=disable` | Required by the server |
 | `PORT` | `8085` | |
+| `MIGRATION_TIMEOUT` | `5m` | Deadline for the migration lock wait and all pending migrations; the server's built-in default |
 | `POSTGRES_PASSWORD` | `postgres` | Local only; applied when the volume is first created |
 | `TEST_DATABASE_URL` | none | Enables database-backed tests |
 

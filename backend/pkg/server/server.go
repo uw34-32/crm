@@ -19,10 +19,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const (
-	startupTimeout  = 30 * time.Second
-	shutdownTimeout = 10 * time.Second
-)
+const shutdownTimeout = 10 * time.Second
+
+// startupTimeout bounds the initial connection check. Migrations have their
+// own deadline, config.Config.MigrationTimeout. It is a variable so tests can
+// shorten it.
+var startupTimeout = 30 * time.Second
 
 type Server struct {
 	http *http.Server
@@ -37,11 +39,9 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("configure database pool: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, startupTimeout)
-	defer cancel()
-	if err := migrate.Apply(ctx, pool); err != nil {
+	if err := startup(ctx, cfg, pool); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("apply migrations: %w", err)
+		return nil, err
 	}
 
 	return &Server{
@@ -53,6 +53,21 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		},
 		pool: pool,
 	}, nil
+}
+
+func startup(ctx context.Context, cfg config.Config, pool *pgxpool.Pool) error {
+	connectCtx, cancel := context.WithTimeout(ctx, startupTimeout)
+	defer cancel()
+	if err := pool.Ping(connectCtx); err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+
+	migrateCtx, cancel := context.WithTimeout(ctx, cfg.MigrationTimeout)
+	defer cancel()
+	if err := migrate.Apply(migrateCtx, pool); err != nil {
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+	return nil
 }
 
 // Run serves until ctx is cancelled, drains in-flight requests, and closes the
