@@ -52,7 +52,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
 - [x] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
 - [x] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
-- [ ] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
+- [x] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
 - [ ] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T9 Web pipeline and activities.** Kanban board with stage moves, deal detail, activity timeline. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T10 Native shell and auth.** Expo and React Native scaffold, API client with refresh, secure token storage, login and register, workspace switcher. Checks: typecheck, unit tests, app run.
@@ -76,6 +76,18 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 | T5 | `bce3adf`, `7df945d`, `31e2d68`, `3dc98bc` | build, vet, gofmt clean; 783 test passes as `crm_app`, parent re-ran `go test`; default pipeline, deal moves, and cross-workspace 404 observed over HTTP | medium; one review of the whole range exceeded the reviewer context budget, so each commit was reviewed separately with owner consent: 4 of 4 approved and acknowledged |
 
 | T5 follow-ups and T6 | `743a361`, `62c2286`, `b00fd92`, `9e941bd`, `ec47be6` | build, vet, gofmt clean; 928 test passes as `crm_app`, parent re-ran `go test`; timeline, task completion, unlink on delete, 409 on last pipeline, and cross-workspace 404 observed over HTTP | medium, granted, one review of the range approved and acknowledged |
+
+| T6 fixes and T7 | `75a2724`, `d923bc9`, `b58e513` | backend 950 test passes; web `pnpm check` clean, 59 Vitest passes, `pnpm build` ok; parent re-ran web tests and backend `app` and `store`; register, workspaces, reload, logout, and phone width observed in a browser | high, granted, four lenses approved and acknowledged |
+
+The two T6 warnings are fixed: `lost_reason` is judged by the target stage under the pipeline lock, and `due_at` is checked at microsecond precision against the schema bounds.
+
+T7 decisions: access token in memory and refresh token in `localStorage`; a refresh that fails for any reason other than a refused token keeps the session; Kit 2 and Vite 7, matching `contacts`; English only, with no i18n layer; the dev server is fixed to port 5173 for CORS; `VITE_API_URL` defaults to `http://localhost:8085`.
+
+T7 review warnings, not yet fixed:
+
+- Single-flight refresh covers one tab only, so tabs restoring together can reuse one refresh token and trigger family revocation (`web/src/lib/api/client.js:100-109`).
+- After a failed restore, signing out leaves the restore error screen up (`web/src/lib/session.svelte.js:91-95`).
+- Two divergent no-storage fallbacks (`web/src/lib/workspaces.svelte.js:11-18`).
 
 T5 follow-ups are fixed: the last live pipeline returns 409, the blank `lost_reason` case, the README table, the two weak tests, and invalid UTF-8 on contacts and companies.
 
@@ -108,4 +120,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 in progress on `feat/crm-web-shell` through one delegated writer, starting with the two T6 warnings. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 is done on `feat/crm-web-shell`; its delivery is the owner's decision. Next: fix the T7 warnings, then T8. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
