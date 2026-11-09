@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"crm/pkg/auth"
 	"crm/pkg/config"
 	"crm/pkg/store"
 	"crm/pkg/testdb"
@@ -103,11 +104,14 @@ func TestNewFailsWhenDatabaseUnreachable(t *testing.T) {
 		MigrationDatabaseURL: "postgres://crm:x@127.0.0.1:1/crm?sslmode=disable&connect_timeout=1",
 		Port:                 "0",
 		MigrationTimeout:     time.Minute,
+		JWTSecret:            testJWTSecret,
 	})
 	if err == nil {
 		t.Fatal("expected an error when the database is unreachable")
 	}
 }
+
+const testJWTSecret = "server-test-secret-long-enough-for-hs256"
 
 // migrationLockKey mirrors the runner's advisory lock key, which must stay
 // stable across releases. Holding it makes New wait inside migrate.Apply.
@@ -149,6 +153,7 @@ func TestNewAndRunServeHealthAgainstRealDatabase(t *testing.T) {
 		MigrationDatabaseURL: ownerURL,
 		Port:                 port,
 		MigrationTimeout:     time.Minute,
+		JWTSecret:            testJWTSecret,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -198,6 +203,7 @@ func TestNewAbortsWhenMigrationDeadlineExpires(t *testing.T) {
 		MigrationDatabaseURL: ownerURL,
 		Port:                 "0",
 		MigrationTimeout:     300 * time.Millisecond,
+		JWTSecret:            testJWTSecret,
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("New = %v, want a deadline error", err)
@@ -225,6 +231,7 @@ func TestMigrationsAreNotBoundByStartupDeadline(t *testing.T) {
 		MigrationDatabaseURL: ownerURL,
 		Port:                 "0",
 		MigrationTimeout:     time.Minute,
+		JWTSecret:            testJWTSecret,
 	})
 	if err != nil {
 		t.Fatalf("New = %v, want success once the lock is released", err)
@@ -242,8 +249,22 @@ func TestNewRefusesPrivilegedAppRole(t *testing.T) {
 		MigrationDatabaseURL: ownerURL,
 		Port:                 "0",
 		MigrationTimeout:     30 * time.Second,
+		JWTSecret:            testJWTSecret,
 	})
 	if !errors.Is(err, store.ErrPrivilegedRole) {
 		t.Fatalf("New = %v, want ErrPrivilegedRole", err)
+	}
+}
+
+func TestNewRefusesWeakJWTSecret(t *testing.T) {
+	_, err := New(context.Background(), config.Config{
+		DatabaseURL:          "postgres://crm:x@127.0.0.1:1/crm",
+		MigrationDatabaseURL: "postgres://crm:x@127.0.0.1:1/crm",
+		Port:                 "0",
+		MigrationTimeout:     time.Minute,
+		JWTSecret:            "short",
+	})
+	if !errors.Is(err, auth.ErrWeakSecret) {
+		t.Fatalf("New = %v, want ErrWeakSecret", err)
 	}
 }

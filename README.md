@@ -1,10 +1,10 @@
 # CRM
 
-A team CRM. This repository currently holds the backend skeleton: configuration, migrations, database roles, and a health route. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository currently holds the backend foundation: configuration, migrations, database roles, a health route, and accounts with token auth. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
-Go, Chi v5, pgx v5, and PostgreSQL 16 through Docker Compose.
+Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, and PostgreSQL 16 through Docker Compose.
 
 ## Layout
 
@@ -13,8 +13,10 @@ Go, Chi v5, pgx v5, and PostgreSQL 16 through Docker Compose.
 | `backend/cmd/server` | Entry point; handles SIGINT and SIGTERM |
 | `backend/pkg/config` | Settings from the environment |
 | `backend/pkg/migrate` | Embedded SQL migrations and their runner |
+| `backend/pkg/auth` | Access tokens and password hashing |
+| `backend/pkg/model` | Types shared by the store and the API |
 | `backend/pkg/store` | Database access |
-| `backend/pkg/app` | Routes and handlers |
+| `backend/pkg/app` | Routes, handlers, and middleware |
 | `backend/pkg/server` | Wires the above and runs the HTTP server |
 | `backend/pkg/testdb` | Connections for database-backed tests |
 | `scripts/` | Local development helpers |
@@ -38,6 +40,13 @@ Settings come from the environment. `dev.sh` also reads an optional `.env` in th
 | `MIGRATION_DATABASE_URL` | `postgres://postgres:postgres@localhost:5435/crm?sslmode=disable` | Required by the server; the role that owns the schema |
 | `PORT` | `8085` | |
 | `MIGRATION_TIMEOUT` | `5m` | Deadline for the migration lock wait and all pending migrations; the server's built-in default |
+| `JWT_SECRET` | local placeholder | Required by the server, which has no default; at least 32 bytes |
+| `ACCESS_TOKEN_TTL` | `15m` | The server's built-in default |
+| `REFRESH_TOKEN_TTL` | `720h` | The server's built-in default; each rotation issues a token with a fresh lifetime |
+| `REFRESH_GRACE` | `10s` | The server's built-in default; `0s` disables retries of a spent token |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | `30` | The server's built-in default; per client, on `/auth/*`; must be positive |
+| `CORS_ORIGINS` | SvelteKit, Expo web, and Tauri local origins | Comma-separated exact origins; none by default in the server; wildcards are refused |
+| `TRUSTED_PROXIES` | none | Comma-separated addresses or CIDR prefixes; forwarding headers are ignored unless the peer is listed |
 | `POSTGRES_PASSWORD` | `postgres` | Local only; applied when the volume is first created |
 | `APP_DB_PASSWORD` | `crm_app_local_dev` | Local only; `scripts/bootstrap-db-roles.sh` sets it on every run; keep it URL-safe |
 | `TEST_DATABASE_URL` | none | App role on the test database; set together with the next one |
@@ -59,6 +68,33 @@ At startup the server reads the role behind `DATABASE_URL` and refuses to boot i
 `crm_app` needs a password, so no migration creates it. `scripts/bootstrap-db-roles.sh` creates or updates it in the Compose database; it is safe to rerun and works on an existing volume. Migrations fail with a clear error if the role is missing. Elsewhere, create the role yourself with the same attributes before the first boot.
 
 `002_app_role_grants.sql` gives `crm_app` `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on every table the owner creates afterwards, through default privileges. Those apply only to objects created by the role that set them, so always migrate as the same owner. A table that needs less must `REVOKE` in its migration.
+
+## API
+
+Successful responses have the shape `{"data": ...}` and failures `{"error": "message"}`.
+
+| Route | Body | Success | Notes |
+| --- | --- | --- | --- |
+| `GET /health` | | 200 | 503 when the database is unreachable |
+| `POST /auth/register` | `email`, `name`, `password` | 201 with `token`, `refresh_token`, `user` | 409 when the email is taken, compared case-insensitively |
+| `POST /auth/login` | `email`, `password` | 200 with `token`, `refresh_token`, `user` | 401 with the same response for a wrong password and an unknown email |
+| `POST /auth/refresh` | `refresh_token` | 200 with `token`, `refresh_token`, `user` | 401 for any invalid token |
+| `POST /auth/logout` | `refresh_token` | 204 | Also 204 for an unknown token |
+| `GET /auth/me` | | 200 with the user | Needs `Authorization: Bearer <token>` |
+
+Passwords are 8 to 72 bytes, the limit of bcrypt.
+
+### Refresh tokens
+
+Each login starts a token family. Only SHA-256 hashes are stored. A refresh spends the presented token and returns a successor, so clients must store the new token every time.
+
+Presenting a spent token revokes the whole family, which ends that login on every client holding it. The exception is a retry within `REFRESH_GRACE` of the rotation, for a client that lost the response: it receives another successor, and the one issued before is spent. Other logins of the same user are unaffected. Logout revokes one family.
+
+### Rate limit and proxies
+
+`/auth/*` allows `AUTH_RATE_LIMIT_PER_MINUTE` requests per client, refilled continuously, and answers 429 with `Retry-After` beyond that. A client is an IPv4 address or an IPv6 /64. Limits live in the memory of one server process.
+
+The client address is the connection's peer. Behind a reverse proxy, list it in `TRUSTED_PROXIES`, or every client shares the proxy's budget; `X-Forwarded-For` and `X-Forwarded-Proto` are read only from listed peers.
 
 ## Test
 

@@ -13,11 +13,12 @@ import (
 	"crm/pkg/store"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func getHealth(t *testing.T, s *store.Store) *httptest.ResponseRecorder {
 	t.Helper()
-	h := New(s, WithHealthTimeout(2*time.Second)).Handler()
+	h := New(s, testManager(t, time.Minute), WithPasswordCost(bcrypt.MinCost), WithHealthTimeout(2*time.Second)).Handler()
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
@@ -26,15 +27,20 @@ func getHealth(t *testing.T, s *store.Store) *httptest.ResponseRecorder {
 	return rec
 }
 
-// Connects lazily, so no database is needed: nothing listens on port 1.
-func TestHealthReturns503WhenDatabaseUnreachable(t *testing.T) {
+// unreachablePool connects lazily, so no database is needed: nothing listens on
+// port 1.
+func unreachablePool(t *testing.T) *pgxpool.Pool {
+	t.Helper()
 	pool, err := pgxpool.New(context.Background(), "postgres://crm:secret-password@127.0.0.1:1/crm?sslmode=disable&connect_timeout=1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
+	return pool
+}
 
-	rec := getHealth(t, store.New(pool))
+func TestHealthReturns503WhenDatabaseUnreachable(t *testing.T) {
+	rec := getHealth(t, store.New(unreachablePool(t)))
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", rec.Code)

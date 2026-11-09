@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"crm/pkg/app"
+	"crm/pkg/auth"
 	"crm/pkg/config"
 	"crm/pkg/migrate"
 	"crm/pkg/store"
@@ -35,6 +36,11 @@ type Server struct {
 // prepares the server. The caller owns the result and releases it by calling
 // Run.
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	tokens, err := auth.NewManager(cfg.JWTSecret, cfg.AccessTokenTTL)
+	if err != nil {
+		return nil, err
+	}
+
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("configure database pool: %w", err)
@@ -47,9 +53,17 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 
 	return &Server{
 		http: &http.Server{
-			Addr:              ":" + cfg.Port,
-			Handler:           app.New(store.New(pool)).Handler(),
+			Addr: ":" + cfg.Port,
+			Handler: app.New(store.New(pool), tokens,
+				app.WithRefreshTTL(cfg.RefreshTokenTTL),
+				app.WithRefreshGrace(cfg.RefreshGrace),
+				app.WithAuthRateLimit(cfg.AuthRateLimitPerMinute),
+				app.WithCORSOrigins(cfg.CORSOrigins),
+				app.WithTrustedProxies(cfg.TrustedProxies),
+			).Handler(),
 			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
 			IdleTimeout:       60 * time.Second,
 		},
 		pool: pool,
