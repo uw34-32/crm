@@ -1,10 +1,14 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"log"
 	"strings"
 	"sync"
 	"testing"
@@ -185,7 +189,7 @@ func TestRotateRefusesExpiredTokenWithoutRevokingFamily(t *testing.T) {
 	}
 }
 
-func TestGraceWindowAllowsRetryAndKeepsOneLiveToken(t *testing.T) {
+func TestGraceRetryKeepsDeliveredSuccessorLive(t *testing.T) {
 	s := New(testdb.AppPool(t))
 	ctx := context.Background()
 	u := newUser(t, s)
@@ -193,25 +197,195 @@ func TestGraceWindowAllowsRetryAndKeepsOneLiveToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour); err != nil {
+	_, delivered, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+	if err != nil {
 		t.Fatal(err)
 	}
 	_, retried, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
 	if err != nil {
 		t.Fatalf("retry inside grace: %v", err)
 	}
-	var live int
-	err = s.pool.QueryRow(ctx, `
-		SELECT count(*) FROM refresh_tokens t JOIN refresh_token_families f ON f.id = t.family_id
-		 WHERE f.user_id = $1 AND t.rotated_at IS NULL`, u.ID).Scan(&live)
+	if retried == delivered {
+		t.Fatal("the retry returned the same token")
+	}
+	// No grace here: the delivered token must work because it is live, not
+	// because it counts as another retry.
+	_, next, err := s.RotateRefreshToken(ctx, delivered, testTTL, noGrace)
+	if err != nil {
+		t.Fatalf("delivered successor refused after a retry: %v", err)
+	}
+	if _, _, err := s.RotateRefreshToken(ctx, next, testTTL, noGrace); err != nil {
+		t.Errorf("chain broken after a retry: %v", err)
+	}
+}
+
+// Without convergence, a thief replaying a token inside the grace window would
+// hold a second chain that never conflicts with the victim's.
+func TestGraceRetryConvergesOnFirstRotation(t *testing.T) {
+	s := New(testdb.AppPool(t))
+	ctx := context.Background()
+	u := newUser(t, s)
+	first, err := s.IssueRefreshToken(ctx, u.ID, testTTL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if live != 1 {
-		t.Errorf("%d live tokens after a retry, want 1", live)
+	_, a, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, _, err := s.RotateRefreshToken(ctx, retried, testTTL, time.Hour); err != nil {
-		t.Errorf("newest token refused: %v", err)
+	_, b, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live := liveTokens(t, s, u.ID); live != 2 {
+		t.Fatalf("%d live tokens after a retry, want 2", live)
+	}
+	_, next, err := s.RotateRefreshToken(ctx, a, testTTL, noGrace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live := liveTokens(t, s, u.ID); live != 1 {
+		t.Fatalf("%d live tokens after the next rotation, want 1", live)
+	}
+	// The sibling is spent, so presenting it past grace is reuse.
+	if _, _, err := s.RotateRefreshToken(ctx, b, testTTL, noGrace); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("sibling = %v, want ErrInvalidRefreshToken", err)
+	}
+	if _, _, err := s.RotateRefreshToken(ctx, next, testTTL, noGrace); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Errorf("newest token = %v, want the family revoked", err)
+	}
+}
+
+func liveTokens(t *testing.T, s *Store, userID string) int {
+	t.Helper()
+	var live int
+	err := s.pool.QueryRow(context.Background(), `
+		SELECT count(*) FROM refresh_tokens t JOIN refresh_token_families f ON f.id = t.family_id
+		 WHERE f.user_id = $1 AND t.rotated_at IS NULL`, userID).Scan(&live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return live
+}
+
+func TestParallelRefreshInsideGraceKeepsEveryDeliveredTokenUsable(t *testing.T) {
+	s := New(testdb.AppPool(t))
+	ctx := context.Background()
+	u := newUser(t, s)
+	first, err := s.IssueRefreshToken(ctx, u.ID, testTTL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const parallel = 8
+	delivered := make([]string, parallel)
+	errs := make([]error, parallel)
+	var wg sync.WaitGroup
+	for i := range parallel {
+		wg.Go(func() {
+			_, delivered[i], errs[i] = s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+		})
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("parallel refresh %d: %v", i, err)
+		}
+	}
+	// The client keeps whichever response it saw last, and no order is promised.
+	if _, _, err := s.RotateRefreshToken(ctx, delivered[0], testTTL, noGrace); err != nil {
+		t.Errorf("a delivered token was refused: %v", err)
+	}
+}
+
+// Once a successor has been spent the client has moved on, so a late copy of the
+// old token earns nothing. Inside grace that is not proof of theft either, so it
+// must not end the session.
+func TestGraceRetryAfterSuccessorSpentIsRefusedWithoutRevoking(t *testing.T) {
+	s := New(testdb.AppPool(t))
+	ctx := context.Background()
+	u := newUser(t, s)
+	first, err := s.IssueRefreshToken(ctx, u.ID, testTTL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, second, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, third, err := s.RotateRefreshToken(ctx, second, testTTL, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("late retry = %v, want ErrInvalidRefreshToken", err)
+	}
+	if _, _, err := s.RotateRefreshToken(ctx, third, testTTL, noGrace); err != nil {
+		t.Errorf("live token refused after a late retry: %v", err)
+	}
+}
+
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var logs bytes.Buffer
+	original := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(original) })
+	return &logs
+}
+
+func TestReuseRevocationLogsOneEventWithoutSecrets(t *testing.T) {
+	s := New(testdb.AppPool(t))
+	ctx := context.Background()
+	u := newUser(t, s)
+	first, err := s.IssueRefreshToken(ctx, u.ID, testTTL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, successor, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logs := captureLogs(t)
+	// A retry inside grace is not reuse and logs nothing.
+	if _, _, err := s.RotateRefreshToken(ctx, first, testTTL, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if logs.Len() != 0 {
+		t.Fatalf("a retry inside grace logged: %q", logs)
+	}
+
+	if _, _, err := s.RotateRefreshToken(ctx, first, testTTL, noGrace); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("reuse = %v, want ErrInvalidRefreshToken", err)
+	}
+	line := logs.String()
+	if !strings.Contains(line, "refresh_token_reuse") {
+		t.Fatalf("reuse log lacks the event name: %q", line)
+	}
+	if !strings.Contains(line, u.ID) {
+		t.Errorf("reuse log lacks the user ID: %q", line)
+	}
+	sum := sha256.Sum256([]byte(first))
+	for name, secret := range map[string]string{
+		"raw token":     first,
+		"successor":     successor,
+		"hash (hex)":    hex.EncodeToString(sum[:]),
+		"hash (base64)": base64.RawURLEncoding.EncodeToString(sum[:]),
+		"email":         u.Email,
+	} {
+		if strings.Contains(line, secret) {
+			t.Errorf("reuse log exposes the %s", name)
+		}
+	}
+
+	// The family is revoked now, so another attempt is not a new event.
+	logs.Reset()
+	if _, _, err := s.RotateRefreshToken(ctx, first, testTTL, noGrace); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("second reuse = %v", err)
+	}
+	if logs.Len() != 0 {
+		t.Errorf("an already revoked family logged again: %q", logs)
 	}
 }
 

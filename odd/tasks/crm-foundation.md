@@ -46,7 +46,7 @@ Out of scope for this feature: integration with `contacts`, email or calendar sy
 Route for every task: delegated direct, because each touches 2+ non-trivial files (writer trigger).
 
 - [ ] **T1 Backend skeleton.** Go module, config, migrations runner, server entry point, health route, Compose, `dev.sh`, `.env.example`, README. Accept: server boots against Compose Postgres, applies migrations, `GET /health` returns 200. Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
-- [ ] **T2 Auth.** Users, bcrypt, access JWT, refresh token rotation with family revocation. Accept: full auth flow and reuse detection covered by tests. Checks: `go test ./...`.
+- [x] **T2 Auth.** Users, bcrypt, access JWT, refresh token rotation with family revocation. Accept: full auth flow and reuse detection covered by tests. Checks: `go test ./...`.
 - [ ] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
 - [ ] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
 - [ ] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
@@ -64,16 +64,24 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 | --- | --- | --- | --- |
 | T1 (partial, open: `.env.example`) | `be73fb0`, `86c24c5`, `b33a61f` | build, vet, gofmt clean; 14/14 tests with database, parent re-ran `go test`; `/health` 200 and 503 observed; migrations idempotent | high, granted, approved and acknowledged |
 
-Reviewed boundary after T1: `b33a61f`.
+| T1 closure and T2 | `442b607`, `4477ece`, `03c8a40`, `96c1e23`, `bce9b3a`, `d3c9df0`, `84ca825` | build, vet, gofmt clean; 169 test passes as `crm_app`, parent re-ran `go test`; auth flow, reuse revocation, CORS, and rate limit observed over HTTP | high, granted, approved and acknowledged |
 
-### T1 open items
+Reviewed boundary: `84ca825`.
 
-- `.env.example` is missing: the permission settings deny writing it. Needs the owner to allow the path or create the file.
-- Review warning R4: the 30-second startup deadline covers migrations, so a long migration could block boot (`backend/pkg/server/server.go:40-45`). Latent today.
-- Review warning R3-002: no test covers `server.New` plus `Run` serving `/health` against a real database (`backend/pkg/server/server_test.go:93-101`).
-- Suggestions, not scheduled: unused health timeout option, duplicated port default, and three minor reliability notes.
-- Middleware from `contacts` (CORS, rate limit, security headers) was not ported; T2 needs it for auth routes.
+### Open items
+
+- `.env.example` is missing: the permission settings deny writing it. The owner has the content and creates the file. This is the only item keeping T1 open.
+- T2 review warnings accepted for fixing in T3's first work unit (auth hardening):
+  - The 30-per-minute limit also covers `/auth/me` and `/auth/refresh`, so a team behind one NAT can lock itself out (`backend/pkg/app/app.go:112-117`).
+  - A retry inside the grace window spends a successor token already delivered (`backend/pkg/store/refresh_tokens.go:162-164`).
+  - Login, register, and `/auth/me` have no database deadline (`backend/pkg/app/auth.go:123`).
+  - Unbounded bcrypt concurrency (`backend/pkg/app/auth.go:134`).
+  - Family revocation on reuse is not logged (`backend/pkg/store/refresh_tokens.go:141-149`).
+  - A NUL character in input returns 500 (`backend/pkg/app/auth.go:86-88`).
+  - Overflow rate-limit bucket can lock out clients under IPv6 abuse (`backend/pkg/app/middleware.go:192-196`).
+- Pending owner decision: register returns 409 for a taken email, which reveals accounts (`backend/pkg/app/auth.go:101-104`). Hiding it needs email verification, which is outside this feature.
+- Eight review suggestions are not scheduled.
 
 ## Next step
 
-Close the T1 open items, then start T2. The tenancy decision on Row-Level Security is pending with the user before T3.
+T3 in progress through one delegated writer, starting with the auth hardening work unit.

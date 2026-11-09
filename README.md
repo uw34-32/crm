@@ -88,7 +88,9 @@ Passwords are 8 to 72 bytes, the limit of bcrypt.
 
 Each login starts a token family. Only SHA-256 hashes are stored. A refresh spends the presented token and returns a successor, so clients must store the new token every time.
 
-Presenting a spent token revokes the whole family, which ends that login on every client holding it. The exception is a retry within `REFRESH_GRACE` of the rotation, for a client that lost the response: it receives another successor, and the one issued before is spent. Other logins of the same user are unaffected. Logout revokes one family.
+Presenting a spent token revokes the whole family, which ends that login on every client holding it, and logs a `security: refresh_token_reuse` line with the family and user IDs. Other logins of the same user are unaffected. Logout revokes one family.
+
+The exception is a retry within `REFRESH_GRACE` of the rotation, for a lost response or parallel refreshes. It receives another successor and spends nothing, so a token already delivered stays valid, and several tokens can be live for a moment. The next rotation retires all of them except its own successor, so a thief replaying a token inside the window cannot keep a second chain: whichever holder rotates second presents a spent token, which past the window revokes the family. A retry whose successor has already been spent gets a 401 and revokes nothing.
 
 ### Rate limit and proxies
 
