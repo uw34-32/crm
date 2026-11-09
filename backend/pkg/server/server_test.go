@@ -6,13 +6,14 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"crm/pkg/config"
+	"crm/pkg/store"
+	"crm/pkg/testdb"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -98,27 +99,19 @@ func TestServeReturnsListenerErrors(t *testing.T) {
 
 func TestNewFailsWhenDatabaseUnreachable(t *testing.T) {
 	_, err := New(context.Background(), config.Config{
-		DatabaseURL:      "postgres://crm:x@127.0.0.1:1/crm?sslmode=disable&connect_timeout=1",
-		Port:             "0",
-		MigrationTimeout: time.Minute,
+		DatabaseURL:          "postgres://crm:x@127.0.0.1:1/crm?sslmode=disable&connect_timeout=1",
+		MigrationDatabaseURL: "postgres://crm:x@127.0.0.1:1/crm?sslmode=disable&connect_timeout=1",
+		Port:                 "0",
+		MigrationTimeout:     time.Minute,
 	})
 	if err == nil {
-		t.Fatal("expected an error when migrations cannot reach the database")
+		t.Fatal("expected an error when the database is unreachable")
 	}
 }
 
 // migrationLockKey mirrors the runner's advisory lock key, which must stay
 // stable across releases. Holding it makes New wait inside migrate.Apply.
 const migrationLockKey int64 = 7_260_001
-
-func testDatabaseURL(t *testing.T) string {
-	t.Helper()
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping database-backed test")
-	}
-	return url
-}
 
 // holdMigrationLock takes the runner's lock and returns a function that
 // releases it. Release is safe to call more than once.
@@ -148,13 +141,14 @@ func freePort(t *testing.T) string {
 }
 
 func TestNewAndRunServeHealthAgainstRealDatabase(t *testing.T) {
-	url := testDatabaseURL(t)
+	appURL, ownerURL := testdb.URLs(t)
 	port := freePort(t)
 
 	srv, err := New(context.Background(), config.Config{
-		DatabaseURL:      url,
-		Port:             port,
-		MigrationTimeout: time.Minute,
+		DatabaseURL:          appURL,
+		MigrationDatabaseURL: ownerURL,
+		Port:                 port,
+		MigrationTimeout:     time.Minute,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -195,14 +189,15 @@ func TestNewAndRunServeHealthAgainstRealDatabase(t *testing.T) {
 }
 
 func TestNewAbortsWhenMigrationDeadlineExpires(t *testing.T) {
-	url := testDatabaseURL(t)
-	holdMigrationLock(t, url)
+	appURL, ownerURL := testdb.URLs(t)
+	holdMigrationLock(t, ownerURL)
 
 	start := time.Now()
 	_, err := New(context.Background(), config.Config{
-		DatabaseURL:      url,
-		Port:             "0",
-		MigrationTimeout: 300 * time.Millisecond,
+		DatabaseURL:          appURL,
+		MigrationDatabaseURL: ownerURL,
+		Port:                 "0",
+		MigrationTimeout:     300 * time.Millisecond,
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("New = %v, want a deadline error", err)
@@ -215,8 +210,8 @@ func TestNewAbortsWhenMigrationDeadlineExpires(t *testing.T) {
 // A slow migration must outlive the connection-check deadline: only
 // MigrationTimeout bounds it.
 func TestMigrationsAreNotBoundByStartupDeadline(t *testing.T) {
-	url := testDatabaseURL(t)
-	release := holdMigrationLock(t, url)
+	appURL, ownerURL := testdb.URLs(t)
+	release := holdMigrationLock(t, ownerURL)
 
 	original := startupTimeout
 	startupTimeout = time.Second
@@ -226,12 +221,29 @@ func TestMigrationsAreNotBoundByStartupDeadline(t *testing.T) {
 	defer timer.Stop()
 
 	srv, err := New(context.Background(), config.Config{
-		DatabaseURL:      url,
-		Port:             "0",
-		MigrationTimeout: time.Minute,
+		DatabaseURL:          appURL,
+		MigrationDatabaseURL: ownerURL,
+		Port:                 "0",
+		MigrationTimeout:     time.Minute,
 	})
 	if err != nil {
 		t.Fatalf("New = %v, want success once the lock is released", err)
 	}
 	srv.pool.Close()
+}
+
+// Refusal comes before migrations, so a misconfigured server changes nothing.
+func TestNewRefusesPrivilegedAppRole(t *testing.T) {
+	_, ownerURL := testdb.URLs(t)
+	holdMigrationLock(t, ownerURL)
+
+	_, err := New(context.Background(), config.Config{
+		DatabaseURL:          ownerURL,
+		MigrationDatabaseURL: ownerURL,
+		Port:                 "0",
+		MigrationTimeout:     30 * time.Second,
+	})
+	if !errors.Is(err, store.ErrPrivilegedRole) {
+		t.Fatalf("New = %v, want ErrPrivilegedRole", err)
+	}
 }

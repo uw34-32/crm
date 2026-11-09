@@ -6,15 +6,42 @@ import (
 	"time"
 )
 
+// setRequired sets every variable Load insists on.
+func setRequired(t *testing.T) {
+	t.Helper()
+	t.Setenv("DATABASE_URL", "postgres://example/crm")
+	t.Setenv("MIGRATION_DATABASE_URL", "postgres://owner@example/crm")
+}
+
 func TestLoadRequiresDatabaseURL(t *testing.T) {
+	setRequired(t)
 	t.Setenv("DATABASE_URL", "")
 	if _, err := Load(); !errors.Is(err, ErrMissingDatabaseURL) {
 		t.Fatalf("err = %v, want ErrMissingDatabaseURL", err)
 	}
 }
 
+func TestLoadRequiresMigrationDatabaseURL(t *testing.T) {
+	setRequired(t)
+	t.Setenv("MIGRATION_DATABASE_URL", "")
+	if _, err := Load(); !errors.Is(err, ErrMissingMigrationDatabaseURL) {
+		t.Fatalf("err = %v, want ErrMissingMigrationDatabaseURL", err)
+	}
+}
+
+func TestLoadReadsMigrationDatabaseURL(t *testing.T) {
+	setRequired(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MigrationDatabaseURL != "postgres://owner@example/crm" {
+		t.Errorf("MigrationDatabaseURL = %q", cfg.MigrationDatabaseURL)
+	}
+}
+
 func TestLoadDefaultsPort(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://example/crm")
+	setRequired(t)
 	t.Setenv("PORT", "")
 	cfg, err := Load()
 	if err != nil {
@@ -29,7 +56,7 @@ func TestLoadDefaultsPort(t *testing.T) {
 }
 
 func TestLoadReadsPort(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://example/crm")
+	setRequired(t)
 	t.Setenv("PORT", "9000")
 	cfg, err := Load()
 	if err != nil {
@@ -55,7 +82,7 @@ func TestLoadMigrationTimeout(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("DATABASE_URL", "postgres://example/crm")
+			setRequired(t)
 			t.Setenv("MIGRATION_TIMEOUT", tt.value)
 			cfg, err := Load()
 			if tt.wantErr {

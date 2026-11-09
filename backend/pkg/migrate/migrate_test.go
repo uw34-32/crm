@@ -16,9 +16,10 @@ import (
 // tests never see each other's tables or leave anything behind in crm_test.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := os.Getenv("TEST_DATABASE_URL")
+	// Migrations change the schema, so they run as the owner, never the app role.
+	url := os.Getenv("TEST_MIGRATION_DATABASE_URL")
 	if url == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping database-backed test")
+		t.Skip("TEST_MIGRATION_DATABASE_URL not set; skipping database-backed test")
 	}
 	ctx := context.Background()
 
@@ -194,5 +195,43 @@ func TestApplyConcurrentRunsApplyOnce(t *testing.T) {
 	}
 	if got := appliedVersions(t, pool); len(got) != 1 {
 		t.Fatalf("got versions %v, want 1", got)
+	}
+}
+
+// The app role reaches application tables, present and future, but never the
+// runner's bookkeeping or the schema itself.
+func TestEmbeddedMigrationsGrantAppRoleLeastPrivilege(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	if err := Apply(ctx, pool); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "CREATE TABLE future_table (id int)"); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"new table readable and writable", "SELECT has_table_privilege('crm_app', 'future_table', 'SELECT,INSERT,UPDATE,DELETE')", true},
+		{"new table cannot be truncated", "SELECT has_table_privilege('crm_app', 'future_table', 'TRUNCATE')", false},
+		{"schema usable", "SELECT has_schema_privilege('crm_app', current_schema(), 'USAGE')", true},
+		{"schema closed to DDL", "SELECT has_schema_privilege('crm_app', current_schema(), 'CREATE')", false},
+		{"schema_migrations private", "SELECT has_table_privilege('crm_app', 'schema_migrations', 'SELECT,INSERT,UPDATE,DELETE')", false},
+		{"role owns no table here", `SELECT EXISTS (SELECT 1 FROM pg_class c
+			WHERE c.relnamespace = current_schema()::regnamespace AND c.relowner = 'crm_app'::regrole)`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got bool
+			if err := pool.QueryRow(ctx, tt.query).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("%s = %v, want %v", tt.query, got, tt.want)
+			}
+		})
 	}
 }

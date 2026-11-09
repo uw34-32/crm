@@ -14,21 +14,31 @@ const (
 )
 
 type Config struct {
+	// DatabaseURL is the app role the server queries as.
 	DatabaseURL string
-	Port        string
+	// MigrationDatabaseURL is the role that owns the schema and runs migrations.
+	MigrationDatabaseURL string
+	Port                 string
 	// MigrationTimeout bounds the advisory lock wait and all pending migrations.
 	MigrationTimeout time.Duration
 }
 
-var ErrMissingDatabaseURL = errors.New("DATABASE_URL is required")
+var (
+	ErrMissingDatabaseURL          = errors.New("DATABASE_URL is required")
+	ErrMissingMigrationDatabaseURL = errors.New("MIGRATION_DATABASE_URL is required")
+)
 
 func Load() (Config, error) {
 	cfg := Config{
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		Port:        os.Getenv("PORT"),
+		DatabaseURL:          os.Getenv("DATABASE_URL"),
+		MigrationDatabaseURL: os.Getenv("MIGRATION_DATABASE_URL"),
+		Port:                 os.Getenv("PORT"),
 	}
 	if cfg.DatabaseURL == "" {
 		return cfg, ErrMissingDatabaseURL
+	}
+	if cfg.MigrationDatabaseURL == "" {
+		return cfg, ErrMissingMigrationDatabaseURL
 	}
 	if cfg.Port == "" {
 		cfg.Port = defaultPort

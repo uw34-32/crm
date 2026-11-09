@@ -31,8 +31,9 @@ type Server struct {
 	pool *pgxpool.Pool
 }
 
-// New connects to the database and applies pending migrations. The caller
-// owns the result and releases it by calling Run.
+// New verifies the app role, applies pending migrations as the owner, and
+// prepares the server. The caller owns the result and releases it by calling
+// Run.
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -56,15 +57,21 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 }
 
 func startup(ctx context.Context, cfg config.Config, pool *pgxpool.Pool) error {
+	// Checked first, so a server that would refuse to boot changes nothing.
 	connectCtx, cancel := context.WithTimeout(ctx, startupTimeout)
 	defer cancel()
-	if err := pool.Ping(connectCtx); err != nil {
-		return fmt.Errorf("connect to database: %w", err)
+	if err := store.New(pool).CheckAppRole(connectCtx); err != nil {
+		return fmt.Errorf("check database role: %w", err)
 	}
 
 	migrateCtx, cancel := context.WithTimeout(ctx, cfg.MigrationTimeout)
 	defer cancel()
-	if err := migrate.Apply(migrateCtx, pool); err != nil {
+	owner, err := pgxpool.New(migrateCtx, cfg.MigrationDatabaseURL)
+	if err != nil {
+		return fmt.Errorf("configure migration connection: %w", err)
+	}
+	defer owner.Close()
+	if err := migrate.Apply(migrateCtx, owner); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 	return nil
