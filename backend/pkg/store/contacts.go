@@ -204,7 +204,10 @@ func (s *Store) UpdateContact(ctx context.Context, workspaceID, id string, patch
 	return c, nil
 }
 
-// DeleteContact soft-deletes a live contact, or returns ErrContactNotFound.
+// DeleteContact soft-deletes a live contact, or returns ErrContactNotFound. Its deals
+// stay, and lose the link in the same transaction. The contact's row is updated first,
+// as in DeleteCompany, so a deal being linked to it either commits first and is seen by
+// the unlink, or finds no live contact afterwards.
 func (s *Store) DeleteContact(ctx context.Context, workspaceID, id string) error {
 	if !validUUID(id) {
 		return ErrContactNotFound
@@ -220,6 +223,6 @@ func (s *Store) DeleteContact(ctx context.Context, workspaceID, id string) error
 		if tag.RowsAffected() == 0 {
 			return ErrContactNotFound
 		}
-		return nil
+		return unlinkDeals(ctx, q, workspaceID, dealContactLink, id)
 	})
 }

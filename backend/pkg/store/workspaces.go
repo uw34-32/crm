@@ -417,7 +417,26 @@ func (s *Store) ChangeMemberRole(ctx context.Context, workspaceID, actorID, targ
 	return m, nil
 }
 
+// deleteMember ends a membership. The member's deals stay in the workspace with no
+// owner, for a manager to reassign: picking a new owner is a judgement the removal
+// cannot make, and someone who left has nobody to hand over to.
+//
+// The member's row is locked first. That waits for any assignment still in progress,
+// and the unlink, a new statement, then sees it, while a later one finds no member. See
+// holdMember. FOR NO KEY UPDATE, like the soft delete of a company: it conflicts with
+// the FOR SHARE of an assignment but not with the FOR KEY SHARE of a foreign key check.
+// A board move holding the pipeline lock can run such a check on this row, so with FOR
+// UPDATE here the two would deadlock, this side waiting for that pipeline.
 func deleteMember(ctx context.Context, q Querier, workspaceID, userID string) error {
+	if _, err := q.Exec(ctx, `
+		SELECT 1 FROM workspace_members
+		 WHERE workspace_id = $1::text::uuid AND user_id = $2::text::uuid
+		   FOR NO KEY UPDATE`, workspaceID, userID); err != nil {
+		return fmt.Errorf("lock member: %w", err)
+	}
+	if err := unlinkDeals(ctx, q, workspaceID, dealOwnerLink, userID); err != nil {
+		return err
+	}
 	if _, err := q.Exec(ctx,
 		`DELETE FROM workspace_members WHERE workspace_id = $1::text::uuid AND user_id = $2::text::uuid`,
 		workspaceID, userID); err != nil {

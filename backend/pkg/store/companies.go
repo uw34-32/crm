@@ -133,12 +133,15 @@ func (s *Store) UpdateCompany(ctx context.Context, workspaceID, id string, patch
 }
 
 // DeleteCompany soft-deletes a live company, or returns ErrCompanyNotFound. Its
-// contacts stay, because they are still people the workspace knows, and lose the
-// link in the same transaction. That covers soft-deleted contacts too, so nothing
-// points at a company nobody can see. updated_at moves, so a later sync notices.
+// contacts and deals stay, because they are still people and sales the workspace
+// knows, and lose the link in the same transaction. That covers soft-deleted ones
+// too, so nothing points at a company nobody can see. updated_at moves, so a later
+// sync notices.
 //
 // The company's row is updated first. That waits for any link still in progress,
-// and the unlink, a new statement, then sees it. See holdLiveCompany.
+// and the unlinks, new statements, then see it. See holdLiveCompany. Contacts come
+// before deals, because a deal being linked may hold a share lock on a contact while
+// it waits for the pipeline lock, which unlinkDeals takes.
 func (s *Store) DeleteCompany(ctx context.Context, workspaceID, id string) error {
 	if !validUUID(id) {
 		return ErrCompanyNotFound
@@ -160,6 +163,6 @@ func (s *Store) DeleteCompany(ctx context.Context, workspaceID, id string) error
 			workspaceID, id); err != nil {
 			return fmt.Errorf("unlink contacts: %w", err)
 		}
-		return nil
+		return unlinkDeals(ctx, q, workspaceID, dealCompanyLink, id)
 	})
 }

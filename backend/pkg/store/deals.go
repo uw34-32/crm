@@ -107,6 +107,38 @@ func holdDealLinks(ctx context.Context, q Querier, workspaceID string, companyID
 	return nil
 }
 
+// The columns unlinkDeals can clear. These are constants, never input.
+const (
+	dealCompanyLink = "company_id"
+	dealContactLink = "contact_id"
+	dealOwnerLink   = "owner_id"
+)
+
+// unlinkDeals clears one link on every deal that has it, soft-deleted deals too, so
+// nothing points at what is going away. updated_at moves, so a later sync notices.
+//
+// This updates many deals at once, as a board move does, so it must take the same lock
+// a move does, or the two could deadlock over each other's rows. It locks the pipelines
+// in ID order, which keeps two of these from deadlocking as well. By now the caller has
+// locked or updated the row being unlinked, which keeps new links from arriving, so the
+// set of pipelines cannot grow behind its back.
+func unlinkDeals(ctx context.Context, q Querier, workspaceID, column, id string) error {
+	if _, err := q.Exec(ctx, `
+		SELECT 1 FROM pipelines
+		 WHERE workspace_id = $1::text::uuid
+		   AND id IN (SELECT pipeline_id FROM deals WHERE workspace_id = $1::text::uuid AND `+column+` = $2::text::uuid)
+		 ORDER BY id
+		   FOR NO KEY UPDATE`, workspaceID, id); err != nil {
+		return fmt.Errorf("lock pipelines to unlink deals: %w", err)
+	}
+	if _, err := q.Exec(ctx, `
+		UPDATE deals SET `+column+` = NULL, updated_at = now()
+		 WHERE workspace_id = $1::text::uuid AND `+column+` = $2::text::uuid`, workspaceID, id); err != nil {
+		return fmt.Errorf("unlink deals: %w", err)
+	}
+	return nil
+}
+
 // optionalID makes an empty filter value NULL, which the list query reads as no filter.
 func optionalID(id string) *string {
 	if id == "" {
