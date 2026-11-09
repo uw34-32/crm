@@ -418,7 +418,7 @@ func (s *Store) ChangeMemberRole(ctx context.Context, workspaceID, actorID, targ
 }
 
 // deleteMember ends a membership. The member's deals stay in the workspace with no
-// owner, for a manager to reassign: picking a new owner is a judgement the removal
+// owner, and their activities with no author or assignee, for a manager to reassign: picking a new owner is a judgement the removal
 // cannot make, and someone who left has nobody to hand over to.
 //
 // The member's row is locked first. That waits for any assignment still in progress,
@@ -435,6 +435,9 @@ func deleteMember(ctx context.Context, q Querier, workspaceID, userID string) er
 		return fmt.Errorf("lock member: %w", err)
 	}
 	if err := unlinkDeals(ctx, q, workspaceID, dealOwnerLink, userID); err != nil {
+		return err
+	}
+	if err := clearActivityMember(ctx, q, workspaceID, userID); err != nil {
 		return err
 	}
 	if _, err := q.Exec(ctx,

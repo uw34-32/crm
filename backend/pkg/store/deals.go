@@ -496,7 +496,8 @@ func closeDealGap(ctx context.Context, q Querier, workspaceID, stageID string, p
 }
 
 // DeleteDeal soft-deletes a live deal and closes the gap it leaves on the board. The
-// deal keeps pointing at the stage it was in.
+// deal keeps pointing at the stage it was in. Its activities lose the link last, after
+// every deal row is written, because activity rows come after deals in the lock order.
 func (s *Store) DeleteDeal(ctx context.Context, workspaceID, id string) error {
 	if !validUUID(id) {
 		return ErrDealNotFound
@@ -522,7 +523,10 @@ func (s *Store) DeleteDeal(ctx context.Context, workspaceID, id string) error {
 			 WHERE workspace_id = $1::text::uuid AND id = $2::text::uuid`, workspaceID, id); err != nil {
 			return fmt.Errorf("delete deal: %w", err)
 		}
-		return closeDealGap(ctx, q, workspaceID, stageID, position)
+		if err := closeDealGap(ctx, q, workspaceID, stageID, position); err != nil {
+			return err
+		}
+		return unlinkActivities(ctx, q, workspaceID, activityDealLink, id)
 	})
 }
 

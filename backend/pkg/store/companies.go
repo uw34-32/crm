@@ -133,8 +133,9 @@ func (s *Store) UpdateCompany(ctx context.Context, workspaceID, id string, patch
 }
 
 // DeleteCompany soft-deletes a live company, or returns ErrCompanyNotFound. Its
-// contacts and deals stay, because they are still people and sales the workspace
-// knows, and lose the link in the same transaction. That covers soft-deleted ones
+// contacts, deals, and activities stay, because they are still people, sales, and
+// history the workspace knows, and lose the link in the same transaction. An activity
+// that linked to nothing else goes too; see unlinkActivities. That covers soft-deleted ones
 // too, so nothing points at a company nobody can see. updated_at moves, so a later
 // sync notices.
 //
@@ -163,6 +164,9 @@ func (s *Store) DeleteCompany(ctx context.Context, workspaceID, id string) error
 			workspaceID, id); err != nil {
 			return fmt.Errorf("unlink contacts: %w", err)
 		}
-		return unlinkDeals(ctx, q, workspaceID, dealCompanyLink, id)
+		if err := unlinkDeals(ctx, q, workspaceID, dealCompanyLink, id); err != nil {
+			return err
+		}
+		return unlinkActivities(ctx, q, workspaceID, activityCompanyLink, id)
 	})
 }

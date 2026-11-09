@@ -437,8 +437,9 @@ func plantRow(t *testing.T, owner *pgxpool.Pool, sql string, args ...any) {
 // Deletes in A must not reach B, neither through the delete itself nor through the
 // unlinking that follows it. The store runs as a superuser here, so no policy helps:
 // only the store's own workspace filters stand between the two. A member of both
-// workspaces owns a deal in B, and a corrupt row of B points at A's company and
-// contact, so unlinking without the workspace filter would clear B's links too.
+// workspaces owns a deal and an activity in B, and corrupt rows of B point at A's
+// company, contact, and deal, so unlinking without the workspace filter would clear
+// B's links too.
 func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
 	rls, owner := scratchStore(t)
 	ctx := context.Background()
@@ -461,6 +462,16 @@ func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
 	plantRow(t, owner, `
 		INSERT INTO deals (workspace_id, pipeline_id, stage_id, title, currency, company_id, contact_id, position)
 		VALUES ($1, $2, $3, 'Planted in B', 'USD', $4, $5, 99)`, b.ID, ofB.ID, ofB.Stages[0].ID, companyA.ID, contactA.ID)
+	dealA, err := rls.CreateDeal(ctx, a.ID, model.DealInput{PipelineID: defaultPipeline(t, rls, a.ID).ID, Title: "Deal of A", Currency: "USD"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	activityB := newActivity(t, rls, b.ID, model.ActivityInput{
+		Kind: model.ActivityTask, Subject: "Activity of B", AuthorID: shared.ID, AssigneeID: &shared.ID, ContactID: &contactB.ID,
+	})
+	plantRow(t, owner, `
+		INSERT INTO activities (workspace_id, kind, subject, company_id, contact_id, deal_id)
+		VALUES ($1, 'note', 'Planted in B', $2, $3, $4)`, b.ID, companyA.ID, contactA.ID, dealA.ID)
 
 	// B's rows are out of reach from A.
 	if err := s.DeleteCompany(ctx, a.ID, companyB.ID); !errors.Is(err, ErrCompanyNotFound) {
@@ -482,6 +493,9 @@ func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
 	if err := s.RemoveMember(ctx, a.ID, ownerA.ID, shared.ID); err != nil {
 		t.Errorf("remove the shared member from A: %v", err)
 	}
+	if err := s.DeleteDeal(ctx, a.ID, dealA.ID); err != nil {
+		t.Errorf("delete A's deal: %v", err)
+	}
 
 	got, err := rls.GetDeal(ctx, b.ID, d.ID)
 	if err != nil || got.CompanyID == nil || got.ContactID == nil || got.OwnerID == nil || *got.OwnerID != shared.ID {
@@ -490,6 +504,13 @@ func TestUnlinkingStaysInsideTheWorkspace(t *testing.T) {
 	if n := countRows(t, owner, `SELECT count(*) FROM deals WHERE workspace_id = $1 AND company_id = $2 AND contact_id = $3`,
 		b.ID, companyA.ID, contactA.ID); n != 1 {
 		t.Errorf("A's deletes unlinked a row of B: %d planted rows left", n)
+	}
+	if got, err := rls.GetActivity(ctx, b.ID, activityB.ID); err != nil || got.AuthorID == nil || got.AssigneeID == nil {
+		t.Errorf("B's activity after A's removal of a shared member = %+v, %v", got, err)
+	}
+	if n := countRows(t, owner, `SELECT count(*) FROM activities WHERE workspace_id = $1 AND company_id = $2 AND contact_id = $3 AND deal_id = $4 AND deleted_at IS NULL`,
+		b.ID, companyA.ID, contactA.ID, dealA.ID); n != 1 {
+		t.Errorf("A's deletes unlinked an activity of B: %d planted rows left", n)
 	}
 }
 

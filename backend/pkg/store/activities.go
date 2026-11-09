@@ -384,3 +384,70 @@ func (s *Store) SetActivityCompleted(ctx context.Context, workspaceID, id string
 	}
 	return a, nil
 }
+
+// The link columns unlinkActivities can clear. These are constants, never input.
+const (
+	activityContactLink = "contact_id"
+	activityCompanyLink = "company_id"
+	activityDealLink    = "deal_id"
+)
+
+// lockActivities takes the row locks of the activities a multi-row update is about to
+// change, in ID order. Two such updates can overlap, as when a company and one of its
+// contacts are deleted at once; taking their rows in one order keeps them from
+// deadlocking. A write to one activity holds that row only once its links are held, and
+// takes nothing after it, so it cannot close a cycle either.
+func lockActivities(ctx context.Context, q Querier, workspaceID, where, id string) error {
+	if _, err := q.Exec(ctx, `
+		SELECT 1 FROM activities
+		 WHERE workspace_id = $1::text::uuid AND (`+where+`)
+		 ORDER BY id
+		   FOR NO KEY UPDATE`, workspaceID, id); err != nil {
+		return fmt.Errorf("lock activities: %w", err)
+	}
+	return nil
+}
+
+// unlinkActivities clears one link on every activity that has it, soft-deleted ones
+// too, so nothing points at what is going away. An activity whose last link this was
+// is soft-deleted in the same statement, which keeps the rule that a live activity
+// links to something. updated_at moves, so a later sync notices.
+//
+// Callers run this last, after they have updated deals: a deal write holds the pipeline
+// and then deals, and an activity write holds a deal and then its own row, so activity
+// rows come after deals in the lock order. By now the caller has updated the row being
+// unlinked, which keeps new links from arriving behind its back. See holdLiveCompany.
+func unlinkActivities(ctx context.Context, q Querier, workspaceID, column, id string) error {
+	if err := lockActivities(ctx, q, workspaceID, column+` = $2::text::uuid`, id); err != nil {
+		return err
+	}
+	if _, err := q.Exec(ctx, `
+		UPDATE activities
+		   SET `+column+` = NULL,
+		       deleted_at = CASE WHEN deleted_at IS NULL AND num_nonnulls(contact_id, company_id, deal_id) = 1
+		                         THEN now() ELSE deleted_at END,
+		       updated_at = now()
+		 WHERE workspace_id = $1::text::uuid AND `+column+` = $2::text::uuid`, workspaceID, id); err != nil {
+		return fmt.Errorf("unlink activities: %w", err)
+	}
+	return nil
+}
+
+// clearActivityMember forgets a departing member on every activity they wrote or were
+// assigned, which stays: the note is still about its contact, and the task still needs
+// doing, by someone a manager picks. As for deals, rejoining does not bring them back.
+func clearActivityMember(ctx context.Context, q Querier, workspaceID, userID string) error {
+	const named = `author_id = $2::text::uuid OR assignee_id = $2::text::uuid`
+	if err := lockActivities(ctx, q, workspaceID, named, userID); err != nil {
+		return err
+	}
+	if _, err := q.Exec(ctx, `
+		UPDATE activities
+		   SET author_id = CASE WHEN author_id = $2::text::uuid THEN NULL ELSE author_id END,
+		       assignee_id = CASE WHEN assignee_id = $2::text::uuid THEN NULL ELSE assignee_id END,
+		       updated_at = now()
+		 WHERE workspace_id = $1::text::uuid AND (`+named+`)`, workspaceID, userID); err != nil {
+		return fmt.Errorf("clear activity member: %w", err)
+	}
+	return nil
+}

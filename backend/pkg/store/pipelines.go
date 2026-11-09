@@ -69,8 +69,9 @@ func requireManager(ctx context.Context, q Querier, workspaceID, actorID string)
 // not with the foreign key checks of rows inserted under this pipeline.
 //
 // Lock order, which keeps the writers of a workspace from deadlocking: the workspace
-// row, then the rows a deal links to, then the pipeline, then the deals. See
-// lockActor, holdLiveCompany, and unlinkDeals.
+// row, then the rows a deal or activity links to (company, contact, member), then the
+// pipeline, then the deals, then the activities, in ID order when there are many. See
+// lockActor, holdLiveCompany, unlinkDeals, and unlinkActivities.
 func lockPipeline(ctx context.Context, q Querier, workspaceID, pipelineID string) error {
 	if !validUUID(pipelineID) {
 		return ErrPipelineNotFound
