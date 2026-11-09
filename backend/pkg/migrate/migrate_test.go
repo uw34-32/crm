@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io/fs"
 	"os"
+	"path"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -233,5 +236,129 @@ func TestEmbeddedMigrationsGrantAppRoleLeastPrivilege(t *testing.T) {
 				t.Errorf("%s = %v, want %v", tt.query, got, tt.want)
 			}
 		})
+	}
+}
+
+// beforePipelines is the embedded migrations that ran before pipelines existed.
+func beforePipelines(t *testing.T) fstest.MapFS {
+	t.Helper()
+	names, err := fs.Glob(embedded, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subset := fstest.MapFS{}
+	for _, name := range names {
+		if path.Base(name) >= "009" {
+			continue
+		}
+		content, err := fs.ReadFile(embedded, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subset[name] = &fstest.MapFile{Data: content}
+	}
+	if len(subset) != 8 {
+		t.Fatalf("%d migrations before pipelines, want 8", len(subset))
+	}
+	return subset
+}
+
+// Workspaces that exist when the migration runs get the same default pipeline a
+// new workspace gets, in spite of Row-Level Security being forced on both tables.
+func TestMigrationGivesExistingWorkspacesADefaultPipeline(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	if err := apply(ctx, pool, beforePipelines(t)); err != nil {
+		t.Fatalf("apply the earlier migrations: %v", err)
+	}
+	var live, deleted string
+	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (name) VALUES ('Live') RETURNING id::text`).Scan(&live); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO workspaces (name, deleted_at) VALUES ('Deleted', now()) RETURNING id::text`).Scan(&deleted); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Apply(ctx, pool); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	for name, id := range map[string]string{"live": live, "soft-deleted": deleted} {
+		rows, err := pool.Query(ctx, `
+			SELECT s.position, s.kind, s.pipeline_id::text
+			  FROM pipelines p JOIN pipeline_stages s ON s.pipeline_id = p.id AND s.workspace_id = p.workspace_id
+			 WHERE p.workspace_id = $1
+			 ORDER BY s.position`, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pipelines := map[string]bool{}
+		kinds := map[string]int{}
+		position := 0
+		for rows.Next() {
+			var at int
+			var kind, pipeline string
+			if err := rows.Scan(&at, &kind, &pipeline); err != nil {
+				t.Fatal(err)
+			}
+			if at != position {
+				t.Errorf("%s: position %d, want %d", name, at, position)
+			}
+			position++
+			pipelines[pipeline] = true
+			kinds[kind]++
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		if len(pipelines) != 1 || kinds["open"] < 1 || kinds["won"] != 1 || kinds["lost"] != 1 {
+			t.Errorf("%s: pipelines %v, stage kinds %v", name, pipelines, kinds)
+		}
+	}
+}
+
+// A role bound by the forced policies would see no workspaces and backfill nothing,
+// reporting success. The migration has to refuse instead.
+func TestMigrationRefusesARoleThatRowLevelSecurityBinds(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	if err := apply(ctx, pool, beforePipelines(t)); err != nil {
+		t.Fatalf("apply the earlier migrations: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO workspaces (name) VALUES ('Existing')`); err != nil {
+		t.Fatal(err)
+	}
+	var schema string
+	if err := pool.QueryRow(ctx, `SELECT current_schema()`).Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	const role = "crm_migration_probe"
+	if _, err := pool.Exec(ctx, `DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '`+role+`') THEN CREATE ROLE `+role+` NOSUPERUSER NOBYPASSRLS; END IF;
+	END $$`); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DROP ROLE IF EXISTS `+role); err != nil {
+			t.Errorf("drop role: %v", err)
+		}
+	})
+
+	sql, err := fs.ReadFile(embedded, "migrations/009_pipelines.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `GRANT ALL ON SCHEMA `+schema+` TO `+role+`; GRANT ALL ON ALL TABLES IN SCHEMA `+schema+` TO `+role+`; SET LOCAL ROLE `+role); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec(ctx, string(sql))
+	if err == nil || !strings.Contains(err.Error(), "bypass Row-Level Security") {
+		t.Errorf("migration as a bound role = %v, want a refusal", err)
 	}
 }

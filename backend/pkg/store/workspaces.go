@@ -56,11 +56,11 @@ func scanWorkspace(row pgx.Row, role *model.WorkspaceRole) (model.Workspace, err
 	return w, nil
 }
 
-// CreateWorkspace inserts a workspace and its owner in one transaction. The ID is
-// generated first because the policies check every insert against the setting,
-// so the setting has to be known before the row exists. A freshly generated ID
-// cannot name anyone else's workspace, so no membership check applies here. It
-// returns ErrUserNotFound if the owner does not exist.
+// CreateWorkspace inserts a workspace, its owner, and its default pipeline in one
+// transaction. The ID is generated first because the policies check every insert
+// against the setting, so the setting has to be known before the row exists. A
+// freshly generated ID cannot name anyone else's workspace, so no membership check
+// applies here. It returns ErrUserNotFound if the owner does not exist.
 func (s *Store) CreateWorkspace(ctx context.Context, ownerID, name string) (model.Workspace, error) {
 	if !validUUID(ownerID) {
 		return model.Workspace{}, ErrUserNotFound
@@ -86,6 +86,9 @@ func (s *Store) CreateWorkspace(ctx context.Context, ownerID, name string) (mode
 		}
 		if err != nil {
 			return fmt.Errorf("insert workspace owner: %w", err)
+		}
+		if _, err := q.Exec(ctx, `SELECT create_pipeline_with_default_stages($1::text::uuid)`, id); err != nil {
+			return fmt.Errorf("create default pipeline: %w", err)
 		}
 		return nil
 	})

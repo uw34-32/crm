@@ -84,4 +84,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-Deliver T4 as the owner decides, then start T5. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 in progress through one delegated writer on `feat/crm-pipelines-deals`; its delivery is the owner's decision. `origin` uses SSH on port 443 because port 22 times out.
