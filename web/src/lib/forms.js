@@ -6,7 +6,7 @@ const MIN_PASSWORD_CHARS = 8;
 const MAX_PASSWORD_BYTES = 72;
 
 // Something, an @, and a domain with a dot. The API is the judge of the rest.
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** @param {string} value */
 export function checkEmail(value) {
