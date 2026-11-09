@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, createClient } from './client.js';
+import { createTokenStore, REFRESH_TOKEN_KEY } from './tokens.js';
 
 const BASE = 'http://api.test';
 
@@ -325,5 +326,128 @@ describe('error messages', () => {
       throw new DOMException('The operation was aborted.', 'AbortError');
     });
     expect(failure.name).toBe('AbortError');
+  });
+});
+
+describe('refresh across tabs', () => {
+  /** Storage shared by every tab of one browser. */
+  function sharedStorage() {
+    const map = new Map();
+    return {
+      getItem: (/** @type {string} */ key) => (map.has(key) ? map.get(key) : null),
+      setItem: (/** @type {string} */ key, /** @type {string} */ value) => void map.set(key, String(value)),
+      removeItem: (/** @type {string} */ key) => void map.delete(key)
+    };
+  }
+
+  /** Web Locks as a browser grants them: one holder per name at a time, in request order. */
+  function sharedLocks() {
+    /** @type {Map<string, Promise<unknown>>} */
+    const tails = new Map();
+    const requested = /** @type {string[]} */ ([]);
+    return {
+      requested,
+      /** @template T @param {string} name @param {() => Promise<T>} callback */
+      request(name, callback) {
+        requested.push(name);
+        const run = (tails.get(name) ?? Promise.resolve()).then(() => callback());
+        tails.set(name, run.catch(() => undefined));
+        return run;
+      }
+    };
+  }
+
+  /** An API that rotates refresh tokens and revokes the family when a spent one returns. */
+  function rotatingServer() {
+    let n = 1;
+    const server = { live: new Set(['refresh-1']), spent: new Set(), revoked: false, rotations: 0 };
+    const fetch = vi.fn(async (/** @type {RequestInfo | URL} */ url, /** @type {RequestInit} */ init = {}) => {
+      expect(String(url)).toBe(`${BASE}/auth/refresh`);
+      const { refresh_token: presented } = JSON.parse(String(init.body));
+      // Both tabs' requests are in flight before either answer arrives.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (server.spent.has(presented)) {
+        server.revoked = true;
+        server.live.clear();
+        return reply(401, { error: 'invalid refresh token' });
+      }
+      if (!server.live.has(presented)) return reply(401, { error: 'invalid refresh token' });
+      server.live.delete(presented);
+      server.spent.add(presented);
+      n++;
+      server.rotations++;
+      server.live.add(`refresh-${n}`);
+      return reply(200, { data: { token: `access-${n}`, refresh_token: `refresh-${n}`, user: { id: 'u1' } } });
+    });
+    return { server, fetch };
+  }
+
+  /** @param {ReturnType<typeof sharedStorage>} storage @param {ReturnType<typeof rotatingServer>} api @param {unknown} locks */
+  function tab(storage, api, locks) {
+    const tokens = createTokenStore(storage);
+    const onSessionEnd = vi.fn();
+    const client = createClient({ baseUrl: BASE, fetch: api.fetch, tokens, onSessionEnd, locks: /** @type {any} */ (locks) });
+    return { tokens, client, onSessionEnd };
+  }
+
+  it('rotates one at a time across tabs, each with the token the last one stored', async () => {
+    const storage = sharedStorage();
+    storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const api = rotatingServer();
+    const locks = sharedLocks();
+    const first = tab(storage, api, locks);
+    const second = tab(storage, api, locks);
+
+    // Two tabs restoring the session at the same moment.
+    await Promise.all([first.client.refresh(), second.client.refresh()]);
+
+    expect(api.server.revoked).toBe(false);
+    expect(api.server.rotations).toBe(2);
+    expect(api.fetch.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).refresh_token)).toEqual(['refresh-1', 'refresh-2']);
+    expect(first.tokens.getAccess()).toBe('access-2');
+    expect(second.tokens.getAccess()).toBe('access-3');
+    expect(storage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-3');
+    expect(first.onSessionEnd).not.toHaveBeenCalled();
+    expect(second.onSessionEnd).not.toHaveBeenCalled();
+    expect(new Set(locks.requested)).toEqual(new Set(['crm.refresh']));
+  });
+
+  it('ends the session in a tab whose lock turn comes after another tab signed out', async () => {
+    const storage = sharedStorage();
+    storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const api = rotatingServer();
+    const locks = sharedLocks();
+    const other = tab(storage, api, locks);
+    const here = tab(storage, api, locks);
+
+    // The other tab holds the lock while this one waits; it signs out before releasing it.
+    let release = () => {};
+    let started = () => {};
+    const running = new Promise((resolve) => (started = () => resolve(undefined)));
+    const held = locks.request('crm.refresh', () => {
+      started();
+      return new Promise((resolve) => (release = () => resolve(undefined)));
+    });
+    await running;
+    const waiting = here.client.refresh().catch((e) => e);
+    other.tokens.clear();
+    release();
+    await held;
+
+    expect(await waiting).toMatchObject({ status: 401 });
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(here.onSessionEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('still refreshes, one request at a time within the tab, where Web Locks are missing', async () => {
+    const storage = sharedStorage();
+    storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const api = rotatingServer();
+    const only = tab(storage, api, null);
+
+    await Promise.all([only.client.refresh(), only.client.refresh()]);
+
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+    expect(only.tokens.getAccess()).toBe('access-2');
   });
 });

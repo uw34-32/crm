@@ -263,6 +263,7 @@ The dev server stays on port 5173 and fails rather than move, because the API's 
 | --- | --- |
 | `web/src/lib/api/` | The API client, token storage, and logout, with their tests |
 | `web/src/lib/session.svelte.js` | The signed-in user and the shared client |
+| `web/src/lib/storage.js` | `localStorage`, or one stand-in that refuses everything where there is none |
 | `web/src/lib/workspaces.svelte.js`, `web/src/lib/workspaces/` | The user's workspaces and the open one |
 | `web/src/lib/components/` | Shared components |
 | `web/src/routes/(app)/` | Screens that need a session, inside the app shell |
@@ -272,6 +273,8 @@ The dev server stays on port 5173 and fails rather than move, because the API's 
 The access token lives in memory only, and the refresh token in `localStorage` under `crm.refresh_token`, so a reload trades it for a new pair and stays signed in. This is a tradeoff: script injected into the page could read the refresh token. An httpOnly cookie would hide it, but the API takes bearer tokens from three clients (web, native, and desktop) and sets no cookies, so the web app holds the token itself. Rotation with family revocation limits the damage: a stolen token that is used after its owner has rotated revokes the whole login.
 
 On a 401 the client refreshes once and retries the request once. Requests that fail at the same time share that one refresh, so the token rotates once, and a request that left with a token another one has already replaced retries with the new token without refreshing again. A refused refresh token ends the session and returns to sign-in; a lost connection or a 429 keeps it for a later try. 429 and 503 answers say how long to wait when the API sends `Retry-After`.
+
+Tabs share the refresh token through `localStorage`, so two tabs that refresh at once, such as after a browser restores them together, would both present it, and the second would look like reuse and revoke the login. A refresh therefore runs under a Web Locks lock named `crm.refresh` that every tab of the origin shares, and reads the stored token only once it holds the lock, so a tab that waited presents the successor the previous tab stored. Each tab still makes its own refresh call, because the access token lives in each tab's memory. A browser without Web Locks refreshes without the lock and relies on the API's `REFRESH_GRACE` window for refreshes that overlap. Signing out in one tab, or a refused token there, removes the stored token, and the other tabs see the `storage` event and sign out too.
 
 Signing out calls `POST /auth/logout` and forgets the tokens even when that call fails. The open workspace is saved per user under `crm.workspace.<user id>`; when it no longer exists the app opens the first one, and a user with none is asked to create one. Route guards run in the browser only and keep screens to signed-in users; the API is what enforces access.
 

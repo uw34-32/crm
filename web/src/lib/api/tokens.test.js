@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { createTokenStore, REFRESH_TOKEN_KEY } from './tokens.js';
+import { describe, expect, it, vi } from 'vitest';
+import { createTokenStore, REFRESH_TOKEN_KEY, watchSignOut } from './tokens.js';
 
 function memoryStorage() {
   const map = new Map();
@@ -74,5 +74,54 @@ describe('token store', () => {
     expect(tokens.getRefresh()).toBe('refresh-1');
     expect(() => tokens.clear()).not.toThrow();
     expect(tokens.getRefresh()).toBeNull();
+  });
+});
+
+describe('sign-out in another tab', () => {
+  /** @param {Partial<StorageEvent>} init */
+  function storageEvent(init) {
+    return Object.assign(new Event('storage'), init);
+  }
+
+  it('reports a refresh token removed by another tab', () => {
+    const target = new EventTarget();
+    const signedOut = vi.fn();
+    watchSignOut(target, signedOut);
+
+    target.dispatchEvent(storageEvent({ key: REFRESH_TOKEN_KEY, oldValue: 'refresh-1', newValue: null }));
+
+    expect(signedOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports storage cleared by another tab', () => {
+    const target = new EventTarget();
+    const signedOut = vi.fn();
+    watchSignOut(target, signedOut);
+
+    target.dispatchEvent(storageEvent({ key: null, newValue: null }));
+
+    expect(signedOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a rotation and other keys', () => {
+    const target = new EventTarget();
+    const signedOut = vi.fn();
+    watchSignOut(target, signedOut);
+
+    target.dispatchEvent(storageEvent({ key: REFRESH_TOKEN_KEY, oldValue: 'refresh-1', newValue: 'refresh-2' }));
+    target.dispatchEvent(storageEvent({ key: 'crm.workspace.u1', newValue: null }));
+
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it('stops listening when asked', () => {
+    const target = new EventTarget();
+    const signedOut = vi.fn();
+    const stop = watchSignOut(target, signedOut);
+
+    stop();
+    target.dispatchEvent(storageEvent({ key: REFRESH_TOKEN_KEY, newValue: null }));
+
+    expect(signedOut).not.toHaveBeenCalled();
   });
 });

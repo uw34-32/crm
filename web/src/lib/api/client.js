@@ -1,5 +1,6 @@
 // The API client: JSON in and out, the access token on every private request, and one
-// refresh of an expired token shared by every request that needs it.
+// refresh of an expired token shared by every request that needs it, in this tab and
+// across the browser's other tabs.
 
 /**
  * @typedef {{ token: string, refresh_token: string, user?: unknown }} Session
@@ -10,7 +11,11 @@
  *   clear: () => void
  * }} Tokens
  * @typedef {{ method?: string, body?: unknown, auth?: boolean, signal?: AbortSignal }} RequestOptions
+ * @typedef {{ request: <T>(name: string, callback: () => Promise<T>) => Promise<T> }} Locks
  */
+
+/** The Web Locks name every tab of this origin rotates the refresh token under. */
+export const REFRESH_LOCK = 'crm.refresh';
 
 const MSG_NETWORK = 'Cannot reach the server. Check your connection and try again.';
 const MSG_SERVER = 'Something went wrong on the server. Try again in a moment.';
@@ -54,6 +59,15 @@ async function errorOf(res) {
   return new ApiError(res.status, apiMessage || MSG_SERVER, retryAfter);
 }
 
+/** The browser's Web Locks, where it has them. @returns {Locks | null} */
+function defaultLocks() {
+  try {
+    return globalThis.navigator?.locks ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** @param {unknown} err */
 function isAbort(err) {
   return err instanceof Error && err.name === 'AbortError';
@@ -64,10 +78,13 @@ function isAbort(err) {
  *   baseUrl: string,
  *   fetch: typeof globalThis.fetch,
  *   tokens: Tokens,
- *   onSessionEnd: () => void
+ *   onSessionEnd: () => void,
+ *   locks?: Locks | null
  * }} options
+ * locks defaults to the browser's Web Locks; null, or a browser without them, rotates
+ * without coordinating with other tabs.
  */
-export function createClient({ baseUrl, fetch, tokens, onSessionEnd }) {
+export function createClient({ baseUrl, fetch, tokens, onSessionEnd, locks = defaultLocks() }) {
   const base = baseUrl.replace(/\/+$/, '');
   /** @type {Promise<void> | null} */
   let refreshing = null;
@@ -96,8 +113,19 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd }) {
    * Trades the refresh token for a new pair. A refused token ends the session; a
    * failure that says nothing about the token, such as a lost connection or a rate
    * limit, keeps it for the next try.
+   *
+   * Tabs share the refresh token through storage, so two tabs rotating at once would
+   * both present it, and the second would look like a stolen token and revoke the
+   * login. Rotations therefore take a lock that every tab shares, and the token is
+   * read only once the lock is held: a tab that waited presents the successor the tab
+   * before it stored. The access token stays in each tab's memory, so every tab still
+   * makes its own call.
    */
-  async function rotate() {
+  function rotate() {
+    return locks ? locks.request(REFRESH_LOCK, rotateNow) : rotateNow();
+  }
+
+  async function rotateNow() {
     const refreshToken = tokens.getRefresh();
     if (!refreshToken) throw endSession();
     const res = await send('/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } }, '');

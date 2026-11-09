@@ -2,7 +2,8 @@
 
 import { logout } from './api/auth.js';
 import { createClient } from './api/client.js';
-import { createTokenStore } from './api/tokens.js';
+import { createTokenStore, watchSignOut } from './api/tokens.js';
+import { browserStorage } from './storage.js';
 
 /**
  * @typedef {{ id: string, email: string, name: string }} User
@@ -10,18 +11,6 @@ import { createTokenStore } from './api/tokens.js';
  */
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8085';
-
-/** Storage, or a stand-in that refuses everything where there is none. */
-function browserStorage() {
-  try {
-    return window.localStorage;
-  } catch {
-    const refuse = () => {
-      throw new Error('no storage');
-    };
-    return { getItem: refuse, setItem: refuse, removeItem: refuse };
-  }
-}
 
 export const session = $state({
   /** @type {User | null} */
@@ -46,15 +35,27 @@ const tokens = {
   }
 };
 
+function endSession() {
+  session.user = null;
+  session.restoreError = '';
+  session.ended = true;
+}
+
 export const api = createClient({
   baseUrl: API_URL,
   fetch: (input, init) => fetch(input, init),
   tokens,
-  onSessionEnd() {
-    session.user = null;
-    session.ended = true;
-  }
+  onSessionEnd: endSession
 });
+
+// Signing out in one tab, or a refused token there, signs out every tab: they share the
+// refresh token, so this one could not refresh anyway.
+if (typeof window !== 'undefined') {
+  watchSignOut(window, () => {
+    stored.clear();
+    if (session.user || session.restoreError) endSession();
+  });
+}
 
 /**
  * Restores the session of a previous visit by trading the stored refresh token for a
@@ -88,8 +89,10 @@ export async function register(account) {
   start(/** @type {AuthResponse} */ (await api.request('/auth/register', { method: 'POST', body: account, auth: false })));
 }
 
+/** Signs out on purpose, including from the screen of a restore that failed. */
 export async function signOut() {
   await logout(api, tokens);
   session.user = null;
+  session.restoreError = '';
   session.ended = false;
 }

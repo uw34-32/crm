@@ -1,6 +1,7 @@
 // The user's workspaces and the one that is open.
 
 import { api, session } from './session.svelte.js';
+import { browserStorage } from './storage.js';
 import { pickWorkspace, readSelection, saveSelection } from './workspaces/selection.js';
 
 /**
@@ -8,14 +9,8 @@ import { pickWorkspace, readSelection, saveSelection } from './workspaces/select
  * @typedef {{ id: string, name: string, role: Role, created_at: string, updated_at: string }} Workspace
  */
 
-/** Storage where there is one; selection.js copes with one that throws. */
-function storage() {
-  try {
-    return window.localStorage;
-  } catch {
-    return /** @type {Storage} */ (/** @type {unknown} */ ({}));
-  }
-}
+/** Storage where there is one; selection.js copes with the stand-in that throws. */
+const storage = () => browserStorage();
 
 export const workspaces = $state({
   /** @type {Workspace[]} */

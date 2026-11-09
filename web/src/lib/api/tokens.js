@@ -50,3 +50,21 @@ export function createTokenStore(storage) {
     }
   };
 }
+
+/**
+ * Calls onSignOut when another tab removes the refresh token: it signed out, or its
+ * token was refused. Browsers send storage events only to the other tabs, so this tab's
+ * own sign-out does not call it. Returns a function that stops listening.
+ * @param {Pick<EventTarget, 'addEventListener' | 'removeEventListener'>} target the window
+ * @param {() => void} onSignOut
+ */
+export function watchSignOut(target, onSignOut) {
+  /** @param {Event} event */
+  const listener = (event) => {
+    const { key, newValue } = /** @type {StorageEvent} */ (event);
+    // A null key means another tab cleared all of storage.
+    if ((key === REFRESH_TOKEN_KEY || key === null) && newValue === null) onSignOut();
+  };
+  target.addEventListener('storage', listener);
+  return () => target.removeEventListener('storage', listener);
+}
