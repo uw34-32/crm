@@ -211,7 +211,8 @@ func (s *Store) RenamePipeline(ctx context.Context, workspaceID, actorID, id, na
 	return p, nil
 }
 
-// DeletePipeline soft-deletes a pipeline. Owners and admins only.
+// DeletePipeline soft-deletes a pipeline, unless it still holds live deals, which would
+// be left somewhere nobody can see. Owners and admins only.
 func (s *Store) DeletePipeline(ctx context.Context, workspaceID, actorID, id string) error {
 	return s.InWorkspace(ctx, workspaceID, func(q Querier) error {
 		if err := requireManager(ctx, q, workspaceID, actorID); err != nil {
@@ -219,6 +220,13 @@ func (s *Store) DeletePipeline(ctx context.Context, workspaceID, actorID, id str
 		}
 		if err := lockPipeline(ctx, q, workspaceID, id); err != nil {
 			return err
+		}
+		holds, err := pipelineHoldsDeals(ctx, q, workspaceID, id)
+		if err != nil {
+			return err
+		}
+		if holds {
+			return ErrPipelineHasDeals
 		}
 		if _, err := q.Exec(ctx, `
 			UPDATE pipelines SET deleted_at = now(), updated_at = now()
@@ -327,7 +335,9 @@ func protectLastOpenStage(ctx context.Context, q Querier, workspaceID, pipelineI
 	return nil
 }
 
-// UpdateStage changes the fields the patch names. Owners and admins only.
+// UpdateStage changes the fields the patch names. It refuses to change the kind of a
+// stage that holds live deals, whose closed state would no longer match it. Owners and
+// admins only.
 func (s *Store) UpdateStage(ctx context.Context, workspaceID, actorID, pipelineID, stageID string, patch model.StagePatch) (model.PipelineStage, error) {
 	var st model.PipelineStage
 	err := s.InWorkspace(ctx, workspaceID, func(q Querier) error {
@@ -341,9 +351,18 @@ func (s *Store) UpdateStage(ctx context.Context, workspaceID, actorID, pipelineI
 		if err != nil {
 			return err
 		}
-		if patch.Kind != nil && *patch.Kind != kind && kind == model.StageOpen {
-			if err := protectLastOpenStage(ctx, q, workspaceID, pipelineID, stageID); err != nil {
+		if patch.Kind != nil && *patch.Kind != kind {
+			holds, err := stageHoldsDeals(ctx, q, workspaceID, stageID)
+			if err != nil {
 				return err
+			}
+			if holds {
+				return ErrStageHasDeals
+			}
+			if kind == model.StageOpen {
+				if err := protectLastOpenStage(ctx, q, workspaceID, pipelineID, stageID); err != nil {
+					return err
+				}
 			}
 		}
 		st, err = scanStage(q.QueryRow(ctx, `
@@ -413,8 +432,8 @@ func (s *Store) ReorderStages(ctx context.Context, workspaceID, actorID, pipelin
 	return stages, nil
 }
 
-// DeleteStage soft-deletes a stage and closes the gap it leaves. It refuses to remove
-// the last open stage. Owners and admins only.
+// DeleteStage soft-deletes a stage and closes the gap it leaves. It refuses to remove a
+// stage that holds live deals, or the last open stage. Owners and admins only.
 func (s *Store) DeleteStage(ctx context.Context, workspaceID, actorID, pipelineID, stageID string) error {
 	return s.InWorkspace(ctx, workspaceID, func(q Querier) error {
 		if err := requireManager(ctx, q, workspaceID, actorID); err != nil {
@@ -426,6 +445,13 @@ func (s *Store) DeleteStage(ctx context.Context, workspaceID, actorID, pipelineI
 		kind, err := readStageKind(ctx, q, workspaceID, pipelineID, stageID)
 		if err != nil {
 			return err
+		}
+		holds, err := stageHoldsDeals(ctx, q, workspaceID, stageID)
+		if err != nil {
+			return err
+		}
+		if holds {
+			return ErrStageHasDeals
 		}
 		if kind == model.StageOpen {
 			if err := protectLastOpenStage(ctx, q, workspaceID, pipelineID, stageID); err != nil {

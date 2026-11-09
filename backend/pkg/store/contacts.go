@@ -69,6 +69,25 @@ func holdLiveCompany(ctx context.Context, q Querier, workspaceID, companyID stri
 	return nil
 }
 
+// holdLiveContact is holdLiveCompany for a contact, for the writes that link a deal.
+func holdLiveContact(ctx context.Context, q Querier, workspaceID, contactID string) error {
+	if !validUUID(contactID) {
+		return ErrContactNotFound
+	}
+	var live int
+	err := q.QueryRow(ctx, `
+		SELECT 1 FROM contacts
+		 WHERE workspace_id = $1::text::uuid AND id = $2::text::uuid AND deleted_at IS NULL
+		   FOR SHARE`, workspaceID, contactID).Scan(&live)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrContactNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("lock contact: %w", err)
+	}
+	return nil
+}
+
 // ListContacts returns one page of the workspace's live contacts, ordered by name
 // without regard to case and then by ID. Search matches the full name, the email,
 // and the linked company's name and domain.
