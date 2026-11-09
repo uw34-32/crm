@@ -193,6 +193,20 @@ func (a *App) Handler() http.Handler {
 			r.With(rateLimit(a.memberLookupLimit, a.trust)).Post("/members", a.addMember)
 			r.Patch("/members/{"+memberParam+"}", a.changeMemberRole)
 			r.Delete("/members/{"+memberParam+"}", a.removeMember)
+			r.Route("/companies", func(r chi.Router) {
+				r.Get("/", a.listCompanies)
+				r.Post("/", a.createCompany)
+				r.Get("/{"+companyParam+"}", a.getCompany)
+				r.Patch("/{"+companyParam+"}", a.updateCompany)
+				r.Delete("/{"+companyParam+"}", a.deleteCompany)
+			})
+			r.Route("/contacts", func(r chi.Router) {
+				r.Get("/", a.listContacts)
+				r.Post("/", a.createContact)
+				r.Get("/{"+contactParam+"}", a.getContact)
+				r.Patch("/{"+contactParam+"}", a.updateContact)
+				r.Delete("/{"+contactParam+"}", a.deleteContact)
+			})
 		})
 	})
 

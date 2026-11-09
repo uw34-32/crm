@@ -1,6 +1,6 @@
 # CRM
 
-A team CRM. This repository currently holds the backend foundation: configuration, migrations, database roles, a health route, accounts with token auth, and workspaces with members and Row-Level Security. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository currently holds the backend: configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, and contacts and companies. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
@@ -93,7 +93,44 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `PATCH /workspaces/{id}/members/{userID}` | `role` | 200 with the member | Owner or admin; 409 for the last owner |
 | `DELETE /workspaces/{id}/members/{userID}` | | 204 | Owner or admin; 409 for the last owner |
 
+| `GET /workspaces/{id}/companies` | | 200 with a page of companies | See [Contacts and companies](#contacts-and-companies) |
+| `POST /workspaces/{id}/companies` | `name`, optional `domain`, `phone`, `industry`, `address` | 201 with the company | |
+| `GET /workspaces/{id}/companies/{companyID}` | | 200 with the company | |
+| `PATCH /workspaces/{id}/companies/{companyID}` | Any of the create fields | 200 with the company | |
+| `DELETE /workspaces/{id}/companies/{companyID}` | | 204 | A soft delete; its contacts stay and lose the link |
+| `GET /workspaces/{id}/contacts` | | 200 with a page of contacts | |
+| `POST /workspaces/{id}/contacts` | `first_name`, optional `last_name`, `email`, `phone`, `title`, `company_id` | 201 with the contact | |
+| `GET /workspaces/{id}/contacts/{contactID}` | | 200 with the contact | |
+| `PATCH /workspaces/{id}/contacts/{contactID}` | Any of the create fields | 200 with the contact | `company_id: null` removes the link |
+| `DELETE /workspaces/{id}/contacts/{contactID}` | | 204 | A soft delete |
+
 Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin`, and `member`.
+
+### Contacts and companies
+
+Every member of a workspace, whatever their role, can read and write its contacts and companies.
+
+A contact or company that is in another workspace, soft-deleted, nonexistent, or named by a malformed ID gets the same 404 with an identical body. The same goes for a `company_id` in a request body: a contact can link only a live company in its own workspace. Anything else that is invalid gets a 400: text beyond its limit, a NUL character, or a `PATCH` with no fields. Text is trimmed, a `PATCH` changes only the fields it names, and an empty string clears an optional field.
+
+| Field | Limit |
+| --- | --- |
+| Company `name` | Required; 200 characters |
+| Company `domain` | A host name with no scheme, stored in lowercase |
+| Company `industry`, `address` | 100 and 500 characters |
+| Contact `first_name` | Required; 100 characters. Someone with one name goes here |
+| Contact `last_name`, `title` | 100 and 200 characters |
+| Contact `email` | A bare address. It does not have to be unique, because people share addresses such as `info@` |
+| `phone` | 50 characters with at least one digit, stored as typed |
+
+Lists take `limit` (1 to 200, default 50), `offset` (0 to 100,000), and `q` (at most 200 characters), and a value out of range gets a 400. A list answers with `items`, `limit`, `offset`, and `has_more`. Companies are ordered by name and contacts by first and last name, ignoring case, with the ID as a tiebreak.
+
+`q` is a case-insensitive substring. `%`, `_`, and `\` in it are literal. Companies match on name and domain. Contacts match on full name, email, and the linked company's name and domain.
+
+Deleting a company keeps its contacts, because they are still people the workspace knows, and clears their link in the same transaction, moving `updated_at`. A write that links a company holds a share lock on it, so a link and a delete cannot race into a contact pointing at a deleted company.
+
+Search scans the live rows of one workspace, in list order, until the page is full. The `(workspace_id, ...)` list indexes make that scan tenant-sized, but no index narrows it further. A trigram index would not help: `ILIKE` is not leakproof, so under Row-Level Security PostgreSQL has to apply it after the policy and cannot use it as an index condition. If a workspace outgrows this, it needs a different search design rather than one more index.
+
+`contacts.external_contact_id` keeps a later integration with the `contacts` project possible. It is nullable, and neither read nor written by the API.
 
 Passwords are 8 to 72 bytes, the limit of bcrypt.
 
