@@ -207,6 +207,27 @@ func (a *App) Handler() http.Handler {
 				r.Patch("/{"+contactParam+"}", a.updateContact)
 				r.Delete("/{"+contactParam+"}", a.deleteContact)
 			})
+			r.Route("/pipelines", func(r chi.Router) {
+				r.Get("/", a.listPipelines)
+				r.Post("/", a.createPipeline)
+				r.Route("/{"+pipelineParam+"}", func(r chi.Router) {
+					r.Get("/", a.getPipeline)
+					r.Patch("/", a.renamePipeline)
+					r.Delete("/", a.deletePipeline)
+					r.Post("/stages", a.createStage)
+					r.Put("/stages/order", a.reorderStages)
+					r.Patch("/stages/{"+stageParam+"}", a.updateStage)
+					r.Delete("/stages/{"+stageParam+"}", a.deleteStage)
+				})
+			})
+			r.Route("/deals", func(r chi.Router) {
+				r.Get("/", a.listDeals)
+				r.Post("/", a.createDeal)
+				r.Get("/{"+dealParam+"}", a.getDeal)
+				r.Patch("/{"+dealParam+"}", a.updateDeal)
+				r.Delete("/{"+dealParam+"}", a.deleteDeal)
+				r.Post("/{"+dealParam+"}/move", a.moveDeal)
+			})
 		})
 	})
 

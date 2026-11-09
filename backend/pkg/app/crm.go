@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -26,15 +28,34 @@ const (
 	msgInvalidListArg = "limit must be 1 to 200, offset 0 to 100000, and q at most 200 characters"
 )
 
-// crmFailure answers a failed contact or company operation. Each not-found error
-// already covers every way a resource can be out of reach, so all of them get one
-// identical body.
+// crmFailure answers a failed CRM operation. Each not-found error already covers
+// every way a resource can be out of reach, so all of them get one identical body.
 func crmFailure(w http.ResponseWriter, op string, err error) {
 	switch {
 	case errors.Is(err, store.ErrCompanyNotFound):
 		errResp(w, http.StatusNotFound, "company not found")
 	case errors.Is(err, store.ErrContactNotFound):
 		errResp(w, http.StatusNotFound, "contact not found")
+	case errors.Is(err, store.ErrPipelineNotFound):
+		errResp(w, http.StatusNotFound, "pipeline not found")
+	case errors.Is(err, store.ErrStageNotFound):
+		errResp(w, http.StatusNotFound, "stage not found")
+	case errors.Is(err, store.ErrDealNotFound):
+		errResp(w, http.StatusNotFound, "deal not found")
+	case errors.Is(err, store.ErrStageNotOpen):
+		errResp(w, http.StatusBadRequest, "a deal starts in an open stage")
+	case errors.Is(err, store.ErrLostReasonRequired):
+		errResp(w, http.StatusBadRequest, "a lost_reason is required to move a deal into a lost stage")
+	case errors.Is(err, store.ErrLostReasonNotAllowed):
+		errResp(w, http.StatusBadRequest, "only a lost stage takes a lost_reason")
+	case errors.Is(err, store.ErrPipelineHasDeals):
+		errResp(w, http.StatusConflict, "the pipeline still holds deals")
+	case errors.Is(err, store.ErrStageHasDeals):
+		errResp(w, http.StatusConflict, "the stage still holds deals")
+	case errors.Is(err, store.ErrLastOpenStage):
+		errResp(w, http.StatusConflict, "a pipeline must keep at least one open stage")
+	case errors.Is(err, store.ErrStageOrderMismatch):
+		errResp(w, http.StatusConflict, "stage_ids must list every stage of the pipeline exactly once")
 	default:
 		workspaceFailure(w, op, err)
 	}
@@ -165,6 +186,43 @@ type optionalString struct {
 func (o *optionalString) UnmarshalJSON(raw []byte) error {
 	o.Set = true
 	return json.Unmarshal(raw, &o.Value)
+}
+
+// optionalInt tells a number that was left out from one sent as null. A fraction or
+// a string fails to decode, so a float can never become a value.
+type optionalInt struct {
+	Set   bool
+	Value *int64
+}
+
+func (o *optionalInt) UnmarshalJSON(raw []byte) error {
+	o.Set = true
+	return json.Unmarshal(raw, &o.Value)
+}
+
+// intValue returns the value as an int, or nil if there is none.
+func (o optionalInt) intValue() *int {
+	if o.Value == nil {
+		return nil
+	}
+	value := int(*o.Value)
+	return &value
+}
+
+var errInvalidUTF8 = errors.New("body is not valid UTF-8")
+
+// decodeText is decodeJSON for bodies that hold text to store. The JSON decoder would
+// silently replace invalid UTF-8, changing what the client sent, so it is refused.
+func decodeText(w http.ResponseWriter, r *http.Request, v any) error {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxAuthBodyBytes))
+	if err != nil {
+		return err
+	}
+	if !utf8.Valid(body) {
+		return errInvalidUTF8
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	return decodeJSON(w, r, v)
 }
 
 type namedText struct {

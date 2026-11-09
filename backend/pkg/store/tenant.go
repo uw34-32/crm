@@ -71,6 +71,12 @@ func validUUID(s string) bool {
 	return true
 }
 
+// ValidID reports whether s has the shape of an ID, for a caller that must refuse a
+// malformed one rather than treat it as not found.
+func ValidID(s string) bool {
+	return validUUID(s)
+}
+
 // ErrUnprotectedTenantTable means a workspace-scoped table could be read or
 // written across tenants at the database layer.
 var ErrUnprotectedTenantTable = errors.New("workspace-scoped table is not protected by Row-Level Security")

@@ -1,6 +1,6 @@
 # CRM
 
-A team CRM. This repository currently holds the backend: configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, and contacts and companies. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository currently holds the backend: configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, and pipelines with stages and deals. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
@@ -97,12 +97,28 @@ Successful responses have the shape `{"data": ...}` and failures `{"error": "mes
 | `POST /workspaces/{id}/companies` | `name`, optional `domain`, `phone`, `industry`, `address` | 201 with the company | |
 | `GET /workspaces/{id}/companies/{companyID}` | | 200 with the company | |
 | `PATCH /workspaces/{id}/companies/{companyID}` | Any of the create fields | 200 with the company | |
-| `DELETE /workspaces/{id}/companies/{companyID}` | | 204 | A soft delete; its contacts stay and lose the link |
+| `DELETE /workspaces/{id}/companies/{companyID}` | | 204 | A soft delete; its contacts and deals stay and lose the link |
 | `GET /workspaces/{id}/contacts` | | 200 with a page of contacts | |
 | `POST /workspaces/{id}/contacts` | `first_name`, optional `last_name`, `email`, `phone`, `title`, `company_id` | 201 with the contact | |
 | `GET /workspaces/{id}/contacts/{contactID}` | | 200 with the contact | |
 | `PATCH /workspaces/{id}/contacts/{contactID}` | Any of the create fields | 200 with the contact | `company_id: null` removes the link |
-| `DELETE /workspaces/{id}/contacts/{contactID}` | | 204 | A soft delete |
+| `DELETE /workspaces/{id}/contacts/{contactID}` | | 204 | A soft delete; its deals stay and lose the link |
+
+| `GET /workspaces/{id}/pipelines` | | 200 with a page of pipelines, without stages | See [Pipelines and deals](#pipelines-and-deals) |
+| `POST /workspaces/{id}/pipelines` | `name` | 201 with the pipeline and default stages | Owner or admin |
+| `GET /workspaces/{id}/pipelines/{pipelineID}` | | 200 with the pipeline and its stages in order | |
+| `PATCH /workspaces/{id}/pipelines/{pipelineID}` | `name` | 200 with the pipeline | Owner or admin |
+| `DELETE /workspaces/{id}/pipelines/{pipelineID}` | | 204 | Owner or admin; a soft delete; 409 while it holds live deals |
+| `POST /workspaces/{id}/pipelines/{pipelineID}/stages` | `name`, optional `color`, `probability`, `kind`, `position` | 201 with the stage | Owner or admin |
+| `PATCH /workspaces/{id}/pipelines/{pipelineID}/stages/{stageID}` | Any of `name`, `color`, `probability`, `kind` | 200 with the stage | Owner or admin; 409 to change the kind while it holds live deals, or to take away the last open stage |
+| `PUT /workspaces/{id}/pipelines/{pipelineID}/stages/order` | `stage_ids` | 200 with the stages | Owner or admin; 409 unless it lists every stage exactly once |
+| `DELETE /workspaces/{id}/pipelines/{pipelineID}/stages/{stageID}` | | 204 | Owner or admin; a soft delete; 409 while it holds live deals, or for the last open stage |
+| `GET /workspaces/{id}/deals` | | 200 with a page of deals | Filters: `pipeline_id`, `stage_id`, `owner_id`, `status`, `q` |
+| `POST /workspaces/{id}/deals` | `title`, `currency`, `pipeline_id`, optional `stage_id`, `value_minor`, `expected_close_date`, `company_id`, `contact_id`, `owner_id` | 201 with the deal | Starts in the first open stage and owned by the caller unless told otherwise |
+| `GET /workspaces/{id}/deals/{dealID}` | | 200 with the deal | |
+| `PATCH /workspaces/{id}/deals/{dealID}` | Any of `title`, `value_minor`, `currency`, `expected_close_date`, `company_id`, `contact_id`, `owner_id` | 200 with the deal | `null` clears the date or a reference |
+| `POST /workspaces/{id}/deals/{dealID}/move` | `stage_id`, optional `position`, `lost_reason` | 200 with the deal | See [Moving a deal](#moving-a-deal) |
+| `DELETE /workspaces/{id}/deals/{dealID}` | | 204 | A soft delete; closes the gap on the board |
 
 Workspace routes need `Authorization: Bearer <token>`. Roles are `owner`, `admin`, and `member`.
 
@@ -131,6 +147,51 @@ Deleting a company keeps its contacts, because they are still people the workspa
 Search scans the live rows of one workspace, in list order, until the page is full. The `(workspace_id, ...)` list indexes make that scan tenant-sized, but no index narrows it further. A trigram index would not help: `ILIKE` is not leakproof, so under Row-Level Security PostgreSQL has to apply it after the policy and cannot use it as an index condition. If a workspace outgrows this, it needs a different search design rather than one more index.
 
 `contacts.external_contact_id` keeps a later integration with the `contacts` project possible. It is nullable, and neither read nor written by the API.
+
+### Pipelines and deals
+
+Every member can read and write deals. Only an owner or admin can change pipelines and stages, and the role is re-read inside the transaction.
+
+A new workspace gets a default pipeline, `Sales`, in the same transaction, with the stages Lead, Qualified, Proposal, Negotiation, Won, and Lost. `009_pipelines.sql` gave every existing workspace the same one, through the one SQL function that defines the default stages. A new pipeline starts with those stages too, so it always has an open stage.
+
+A stage's `kind`, one of `open`, `won`, or `lost`, says what being in it means. Nothing reads a stage's name to decide that. A pipeline keeps at least one open stage. Stages soft-delete, like pipelines and deals, so a soft-deleted deal keeps a valid reference to the stage it was in.
+
+| Field | Limit |
+| --- | --- |
+| Pipeline `name` | Required; 200 characters |
+| Stage `name` | Required; 100 characters |
+| Stage `color` | `#rrggbb`, stored in lowercase; `#64748b` by default |
+| Stage `probability` | 0 to 100; by default 100 for a won stage and 0 otherwise |
+| Stage `kind` | `open` by default |
+| Stage or deal `position` | Not negative. Beyond the end means the end, because the board may have shrunk since the client read it |
+| Deal `title` | Required; 200 characters |
+| Deal `value_minor` | A whole number of minor units, such as cents, from 0 to 999999999999999, a bound well inside what a JSON double holds exactly. A fraction is refused |
+| Deal `currency` | Required; three letters, stored in uppercase. The format is checked, not membership of the ISO list |
+| Deal `expected_close_date` | `YYYY-MM-DD`, from 1900 to 2200 |
+| Deal `lost_reason` | 500 characters |
+
+Lists take `limit`, `offset`, and `q` as described under [Contacts and companies](#contacts-and-companies). Pipelines are ordered oldest first, and `q` matches the name. Deals are in board order: by pipeline, then stage position, then position in the stage. `q` matches the title and the linked company's and contact's names. `pipeline_id`, `stage_id`, `owner_id`, and `status` (`open`, `won`, or `lost`) filter deals, and a malformed filter gets a 400.
+
+A deal's `company_id`, `contact_id`, and `owner_id` must be a live company, a live contact, and a current member of the workspace. Like a pipeline or stage out of reach, anything else gets the same 404 with an identical body, whether it is in another workspace, soft-deleted, nonexistent, or malformed. A write that links one holds a share lock on it, so a link and a delete cannot race into a dangling reference. Invalid UTF-8 and NUL characters get a 400. A `PATCH` that sets a text field or `value_minor` to `null` gets a 400, and `null` on `expected_close_date` or a reference clears it. A `PATCH` cannot set the stage, position, or lost reason, and a deal stays in its pipeline.
+
+Deleting a company or contact keeps its deals and clears their links in the same transaction, moving `updated_at`, soft-deleted deals included. Removing a member, or a member leaving, keeps their deals with `owner_id` set to `null`, for a manager to reassign: picking a new owner is a judgement the removal cannot make, and someone who left has nobody to hand over to. Rejoining does not bring the deals back.
+
+#### Moving a deal
+
+A move puts a deal at a position in a stage of its own pipeline, and every member may do it. A stage of another pipeline gets a 404. A new deal starts in an open stage, and closes only through a move.
+
+| Into | `closed_at` | `lost_reason` |
+| --- | --- | --- |
+| `open` | Cleared | Cleared; a 400 if one is sent |
+| `won` | Set to now | Cleared; a 400 if one is sent |
+| `lost` | Set to now | Required, or a 400 |
+| The stage it is already in | Unchanged | Unchanged, unless a lost stage is given a new one |
+
+`position` is a dense index, 0, 1, 2, ... among a stage's live deals, and the same goes for stages in a pipeline. So a client can use it directly as the place on the board, and a move names where it wants the deal, not how to compute a key between two neighbours. The cost is that a move rewrites the neighbours it shifts, which also moves their `updated_at` so that a later sync sees the new order.
+
+Every write to one pipeline's structure and positions first takes that pipeline's row lock, so concurrent moves run one at a time, and each reads the board the last one left. No two deals can share a position, and no move works from a stale board. A deferrable unique constraint backs this up, refusing a duplicate at the end of a statement. An edit needs no lock, because it writes only the fields it names, and it cannot undo a move or be undone by one. Moves of one deal do not detect each other: the last to run wins. One pipeline's moves are serial, which is fine for the size of team this serves, and different pipelines do not wait for each other.
+
+Writers take locks in one order, which keeps them from deadlocking: the workspace row, then the rows a deal links to (company, contact, member), then the pipeline, then deals.
 
 Passwords are 8 to 72 bytes, the limit of bcrypt.
 
@@ -167,6 +228,8 @@ A workspace is the tenant boundary. A user can belong to many, with one role in 
 | Add, change, or remove `admin` and `member` | yes | yes | no |
 | Make, change, or remove an `owner` | yes | no | no |
 | Delete the workspace | yes | no | no |
+| Change pipelines and stages | yes | yes | no |
+| Read pipelines; read and write contacts, companies, and deals | yes | yes | yes |
 
 A workspace always keeps at least one owner. Every change to a workspace or its members first takes that workspace's row lock and re-reads the actor's role, so concurrent changes cannot remove the last owner, and a role that changed after the middleware ran is not trusted.
 
@@ -183,7 +246,7 @@ Isolation has two layers. Store queries filter on `workspace_id` explicitly, and
 
 `app.user_id` solves the chicken-and-egg problem without `SECURITY DEFINER` functions: it cannot reveal fellow members or allow any write. The `workspace_members` policy compares a column and never queries its own table, so it cannot recurse. Creating a workspace generates the ID first and sets it as `app.workspace_id`, so both inserts pass the policies in one transaction. A fresh ID cannot name another tenant's workspace.
 
-The migration owner is a superuser in Compose, and superusers always bypass Row-Level Security, so migrations are unaffected even with `FORCE`. A non-superuser owner would be bound by `FORCE` and need `BYPASSRLS` for data migrations.
+The migration owner is a superuser in Compose, and superusers always bypass Row-Level Security, so migrations are unaffected even with `FORCE`. A non-superuser owner would be bound by `FORCE` and need `BYPASSRLS` for data migrations. `009_pipelines.sql` backfills data, so it refuses to run without one or the other, rather than see no workspaces and backfill nothing.
 
 Row-Level Security here defends against store bugs, not against SQL injection: code that can run arbitrary SQL as `crm_app` can also call `set_config`. It also does not enforce the soft delete, which is the store's and the middleware's job.
 
@@ -249,7 +312,7 @@ TEST_MIGRATION_DATABASE_URL='postgres://postgres:postgres@localhost:5435/crm_tes
 go test -race ./...
 ```
 
-Migration tests run in throwaway schemas and drop them afterwards. Other database-backed tests migrate the `public` schema of `crm_test`. Isolation tests connect as `crm_app` and run raw SQL with no tenant filter, so they prove the policies independently of the store.
+Migration tests, and the store tests that sabotage the schema, run in throwaway schemas and drop them afterwards. Other database-backed tests migrate the `public` schema of `crm_test`. Isolation tests connect as `crm_app` and run raw SQL with no tenant filter, so they prove the policies independently of the store.
 
 ## Migrations
 
