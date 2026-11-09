@@ -153,6 +153,9 @@ func TestLoadAuthDefaults(t *testing.T) {
 	if cfg.AuthRateLimitPerMinute != 30 {
 		t.Errorf("AuthRateLimitPerMinute = %d", cfg.AuthRateLimitPerMinute)
 	}
+	if cfg.SessionRateLimitPerMinute != 600 {
+		t.Errorf("SessionRateLimitPerMinute = %d", cfg.SessionRateLimitPerMinute)
+	}
 	if len(cfg.CORSOrigins) != 0 {
 		t.Errorf("CORSOrigins = %v, want none by default", cfg.CORSOrigins)
 	}
@@ -170,6 +173,8 @@ func TestLoadRefusesBadAuthSettings(t *testing.T) {
 		{"zero rate limit", "AUTH_RATE_LIMIT_PER_MINUTE", "0"},
 		{"negative rate limit", "AUTH_RATE_LIMIT_PER_MINUTE", "-5"},
 		{"garbage rate limit", "AUTH_RATE_LIMIT_PER_MINUTE", "lots"},
+		{"zero session rate limit", "AUTH_SESSION_RATE_LIMIT_PER_MINUTE", "0"},
+		{"garbage session rate limit", "AUTH_SESSION_RATE_LIMIT_PER_MINUTE", "lots"},
 		{"wildcard origin", "CORS_ORIGINS", "*"},
 		{"wildcard among origins", "CORS_ORIGINS", "http://localhost:5173,*"},
 		{"origin with a path", "CORS_ORIGINS", "http://localhost:5173/app"},

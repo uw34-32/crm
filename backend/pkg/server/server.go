@@ -58,6 +58,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 				app.WithRefreshTTL(cfg.RefreshTokenTTL),
 				app.WithRefreshGrace(cfg.RefreshGrace),
 				app.WithAuthRateLimit(cfg.AuthRateLimitPerMinute),
+				app.WithSessionRateLimit(cfg.SessionRateLimitPerMinute),
 				app.WithCORSOrigins(cfg.CORSOrigins),
 				app.WithTrustedProxies(cfg.TrustedProxies),
 			).Handler(),

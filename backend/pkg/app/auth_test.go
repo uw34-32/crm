@@ -41,7 +41,7 @@ func testManager(t *testing.T, ttl time.Duration) *auth.Manager {
 // generous rate limit and a cheap bcrypt cost unless opts override them.
 func authHandler(t *testing.T, opts ...Option) http.Handler {
 	t.Helper()
-	base := []Option{WithPasswordCost(bcrypt.MinCost), WithAuthRateLimit(1_000_000), WithRefreshGrace(0)}
+	base := []Option{WithPasswordCost(bcrypt.MinCost), WithAuthRateLimit(1_000_000), WithSessionRateLimit(1_000_000), WithRefreshGrace(0)}
 	return New(store.New(testdb.AppPool(t)), testManager(t, time.Minute), append(base, opts...)...).Handler()
 }
 

@@ -15,12 +15,13 @@ import (
 )
 
 const (
-	defaultPort                   = "8085"
-	defaultMigrationTimeout       = 5 * time.Minute
-	defaultAccessTokenTTL         = 15 * time.Minute
-	defaultRefreshTokenTTL        = 30 * 24 * time.Hour
-	defaultRefreshGrace           = 10 * time.Second
-	defaultAuthRateLimitPerMinute = 30
+	defaultPort                      = "8085"
+	defaultMigrationTimeout          = 5 * time.Minute
+	defaultAccessTokenTTL            = 15 * time.Minute
+	defaultRefreshTokenTTL           = 30 * 24 * time.Hour
+	defaultRefreshGrace              = 10 * time.Second
+	defaultAuthRateLimitPerMinute    = 30
+	defaultSessionRateLimitPerMinute = 600
 )
 
 type Config struct {
@@ -39,8 +40,13 @@ type Config struct {
 	// RefreshGrace is how long after rotation a spent refresh token may be
 	// retried. Zero disables retries.
 	RefreshGrace time.Duration
-	// AuthRateLimitPerMinute is the per-client budget on auth routes.
+	// AuthRateLimitPerMinute is the per-client budget on password routes, whose
+	// work is deliberately expensive.
 	AuthRateLimitPerMinute int
+	// SessionRateLimitPerMinute is the per-client budget on every other
+	// authenticated route. A whole team can share one client address, so it is
+	// far larger.
+	SessionRateLimitPerMinute int
 	// CORSOrigins are the browser origins allowed to call the API. Wildcards are
 	// refused.
 	CORSOrigins []string
@@ -95,6 +101,9 @@ func Load() (Config, error) {
 		return cfg, errors.New("REFRESH_GRACE must not be negative")
 	}
 	if cfg.AuthRateLimitPerMinute, err = positiveInt("AUTH_RATE_LIMIT_PER_MINUTE", defaultAuthRateLimitPerMinute); err != nil {
+		return cfg, err
+	}
+	if cfg.SessionRateLimitPerMinute, err = positiveInt("AUTH_SESSION_RATE_LIMIT_PER_MINUTE", defaultSessionRateLimitPerMinute); err != nil {
 		return cfg, err
 	}
 	if cfg.CORSOrigins, err = parseOrigins(os.Getenv("CORS_ORIGINS")); err != nil {

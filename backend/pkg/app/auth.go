@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -28,6 +29,7 @@ const (
 	msgInvalidRefresh = "invalid refresh token"
 	msgUnauthorized   = "unauthorized"
 	msgInternal       = "internal server error"
+	msgBusy           = "server busy, try again shortly"
 )
 
 type authResponse struct {
@@ -63,6 +65,42 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	return nil
 }
 
+// hasNUL reports whether any input holds a NUL, which JSON can carry as an
+// escape but PostgreSQL text cannot store.
+func hasNUL(inputs ...string) bool {
+	return slices.ContainsFunc(inputs, func(s string) bool { return strings.IndexByte(s, 0) >= 0 })
+}
+
+// dbContext bounds one database step of a request. Password hashing does not
+// count against it.
+func (a *App) dbContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), a.dbTimeout)
+}
+
+// withPasswordSlot runs fn once a bcrypt slot is free, and reports false without
+// running it if none frees up within the wait budget or the client gives up. A
+// flood of password requests then costs a bounded amount of CPU and answers 503,
+// rather than queueing until every request times out.
+func (a *App) withPasswordSlot(ctx context.Context, fn func()) bool {
+	timer := time.NewTimer(a.passwordWait)
+	defer timer.Stop()
+	select {
+	case a.passwordSlots <- struct{}{}:
+	case <-timer.C:
+		return false
+	case <-ctx.Done():
+		return false
+	}
+	defer func() { <-a.passwordSlots }()
+	fn()
+	return true
+}
+
+func busy(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "1")
+	errResp(w, http.StatusServiceUnavailable, msgBusy)
+}
+
 func validEmail(email string) bool {
 	if email == "" || len(email) > maxEmailBytes {
 		return false
@@ -80,6 +118,9 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(req.Email)
 	name := strings.TrimSpace(req.Name)
 	switch {
+	case hasNUL(email, name, req.Password):
+		errResp(w, http.StatusBadRequest, msgInvalidBody)
+		return
 	case !validEmail(email):
 		errResp(w, http.StatusBadRequest, "a valid email is required")
 		return
@@ -91,13 +132,20 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := a.passwords.Hash(req.Password)
+	var hash string
+	var err error
+	if !a.withPasswordSlot(r.Context(), func() { hash, err = a.passwords.Hash(req.Password) }) {
+		busy(w)
+		return
+	}
 	if err != nil {
 		log.Printf("register: hash password: %v", err)
 		errResp(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
-	user, err := a.store.CreateUser(r.Context(), email, name, hash)
+	ctx, cancel := a.dbContext(r)
+	defer cancel()
+	user, err := a.store.CreateUser(ctx, email, name, hash)
 	if errors.Is(err, store.ErrEmailTaken) {
 		errResp(w, http.StatusConflict, "email already registered")
 		return
@@ -115,23 +163,36 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 // flag, must come after password verification for the same reason.
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.Email == "" || req.Password == "" {
+	if err := decodeJSON(w, r, &req); err != nil || req.Email == "" || req.Password == "" || hasNUL(req.Email, req.Password) {
 		errResp(w, http.StatusBadRequest, msgInvalidBody)
 		return
 	}
 
-	user, hash, err := a.store.UserCredentialsByEmail(r.Context(), strings.TrimSpace(req.Email))
-	if errors.Is(err, store.ErrUserNotFound) {
-		a.passwords.VerifyUnknown(req.Password)
-		errResp(w, http.StatusUnauthorized, msgInvalidLogin)
-		return
-	}
-	if err != nil {
+	ctx, cancel := a.dbContext(r)
+	defer cancel()
+	user, hash, err := a.store.UserCredentialsByEmail(ctx, strings.TrimSpace(req.Email))
+	known := !errors.Is(err, store.ErrUserNotFound)
+	if known && err != nil {
 		log.Printf("login: %v", err)
 		errResp(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
-	if !a.passwords.Verify(hash, req.Password) {
+
+	// Known and unknown accounts wait for the same slot and do the same work, so
+	// saturation does not tell them apart either.
+	var matched bool
+	verified := a.withPasswordSlot(r.Context(), func() {
+		if known {
+			matched = a.passwords.Verify(hash, req.Password)
+		} else {
+			a.passwords.VerifyUnknown(req.Password)
+		}
+	})
+	if !verified {
+		busy(w)
+		return
+	}
+	if !matched {
 		errResp(w, http.StatusUnauthorized, msgInvalidLogin)
 		return
 	}
@@ -139,7 +200,9 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) startSession(w http.ResponseWriter, r *http.Request, status int, user model.User) {
-	refreshToken, err := a.store.IssueRefreshToken(r.Context(), user.ID, a.refreshTTL)
+	ctx, cancel := a.dbContext(r)
+	defer cancel()
+	refreshToken, err := a.store.IssueRefreshToken(ctx, user.ID, a.refreshTTL)
 	if err != nil {
 		log.Printf("issue refresh token: %v", err)
 		errResp(w, http.StatusInternalServerError, msgInternal)
@@ -167,7 +230,7 @@ func detachedTokenContext(r *http.Request) (context.Context, context.CancelFunc)
 
 func (a *App) refresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.RefreshToken == "" {
+	if err := decodeJSON(w, r, &req); err != nil || req.RefreshToken == "" || hasNUL(req.RefreshToken) {
 		errResp(w, http.StatusBadRequest, msgInvalidBody)
 		return
 	}
@@ -191,7 +254,7 @@ func (a *App) refresh(w http.ResponseWriter, r *http.Request) {
 // answer as a known one.
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.RefreshToken == "" {
+	if err := decodeJSON(w, r, &req); err != nil || req.RefreshToken == "" || hasNUL(req.RefreshToken) {
 		errResp(w, http.StatusBadRequest, msgInvalidBody)
 		return
 	}
@@ -237,7 +300,9 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 		unauthorized(w)
 		return
 	}
-	user, err := a.store.UserByID(r.Context(), userID)
+	ctx, cancel := a.dbContext(r)
+	defer cancel()
+	user, err := a.store.UserByID(ctx, userID)
 	if errors.Is(err, store.ErrUserNotFound) {
 		unauthorized(w)
 		return

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"hash/maphash"
 	"math"
 	"net/http"
 	"net/netip"
@@ -116,6 +117,10 @@ const (
 	// An IPv6 customer usually controls a whole /64, so limiting single addresses
 	// would let one client spend a nearly endless supply of them.
 	limiterIPv6PrefixBits = 64
+
+	limiterOverflowIPv4Bits = 24
+	limiterOverflowIPv6Bits = 32
+	limiterOverflowBuckets  = 4096
 )
 
 // limiterKey is the unit one client is limited by: an IPv4 address or an IPv6
@@ -136,6 +141,24 @@ func limiterKey(addr netip.Addr) netip.Prefix {
 	return prefix
 }
 
+// overflowKey widens a limiter key to the unit that shares overflow budget: an
+// IPv4 /24 or an IPv6 /32. Whoever floods from one such block competes only with
+// that block.
+func overflowKey(key netip.Prefix) netip.Prefix {
+	if !key.IsValid() {
+		return netip.Prefix{}
+	}
+	bits := limiterOverflowIPv4Bits
+	if key.Addr().Is6() {
+		bits = limiterOverflowIPv6Bits
+	}
+	wide, err := key.Addr().Prefix(bits)
+	if err != nil {
+		return netip.Prefix{}
+	}
+	return wide
+}
+
 type bucket struct {
 	tokens  float64
 	updated time.Time
@@ -143,15 +166,24 @@ type bucket struct {
 
 // ipLimiter is a token bucket per client. Holding at most maxEntries, it stays
 // bounded under address-rotation floods, and it never evicts live state to make
-// room: clients that do not fit share one overflow bucket, so they stay limited
-// and nobody's exhausted budget is reset. A bucket that has fully refilled is
-// the same as no bucket, so sweeping those loses nothing.
+// room: nobody's exhausted budget is reset. Clients that do not fit stay limited
+// through a fixed table of overflow buckets, chosen by a seeded hash of the
+// client's wider prefix. Filling the map therefore does not push every later
+// client into the attacker's bucket; they share one only with their own /24 or
+// /32, and with whatever collides in the table. A bucket that has fully refilled
+// is the same as no bucket, so sweeping those loses nothing.
+//
+// What remains: a client in the attacker's wider prefix still shares its budget
+// while the map is full, and an attacker spread over very many /24s or /32s can
+// drain most of the table. Limits also live in one process, so several servers
+// would each grant the full budget.
 //
 // It keeps no goroutine; sweeps run during requests.
 type ipLimiter struct {
 	mu         sync.Mutex
 	buckets    map[netip.Prefix]*bucket
-	overflow   bucket
+	overflow   []bucket
+	seed       maphash.Seed
 	perMinute  float64
 	maxEntries int
 	lastSweep  time.Time
@@ -160,9 +192,14 @@ type ipLimiter struct {
 
 func newIPLimiter(perMinute, maxEntries int, now func() time.Time) *ipLimiter {
 	start := now()
+	overflow := make([]bucket, limiterOverflowBuckets)
+	for i := range overflow {
+		overflow[i] = bucket{tokens: float64(perMinute), updated: start}
+	}
 	return &ipLimiter{
 		buckets:    make(map[netip.Prefix]*bucket),
-		overflow:   bucket{tokens: float64(perMinute), updated: start},
+		overflow:   overflow,
+		seed:       maphash.MakeSeed(),
 		perMinute:  float64(perMinute),
 		maxEntries: maxEntries,
 		lastSweep:  start,
@@ -193,7 +230,7 @@ func (l *ipLimiter) allow(key netip.Prefix) (bool, time.Duration) {
 		b = &bucket{tokens: l.perMinute, updated: now}
 		l.buckets[key] = b
 	default:
-		b = &l.overflow
+		b = &l.overflow[maphash.Comparable(l.seed, overflowKey(key))%uint64(len(l.overflow))]
 	}
 
 	b.tokens = l.refilled(b, now)

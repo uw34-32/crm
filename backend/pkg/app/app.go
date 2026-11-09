@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/netip"
+	"runtime"
 	"time"
 
 	"crm/pkg/auth"
@@ -20,13 +21,19 @@ const (
 	defaultRefreshTTL    = 30 * 24 * time.Hour
 	defaultRefreshGrace  = 10 * time.Second
 	defaultAuthRateLimit = 30
+	// A team can share one client address, and every signed-in screen spends this
+	// budget, so it is far larger than the budget that protects bcrypt.
+	defaultSessionRateLimit = 600
+	defaultDBTimeout        = 5 * time.Second
+	defaultPasswordWait     = 3 * time.Second
 )
 
 type App struct {
 	store         *store.Store
 	tokens        *auth.Manager
 	passwords     *auth.Passwords
-	limiter       *ipLimiter
+	passwordLimit *ipLimiter
+	sessionLimit  *ipLimiter
 	healthTimeout time.Duration
 	passwordCost  int
 	refreshTTL    time.Duration
@@ -34,6 +41,11 @@ type App struct {
 	rateLimit     int
 	corsOrigins   []string
 	trust         proxyTrust
+
+	sessionRateLimit int
+	dbTimeout        time.Duration
+	passwordSlots    chan struct{}
+	passwordWait     time.Duration
 }
 
 type Option func(*App)
@@ -61,9 +73,30 @@ func WithRefreshGrace(d time.Duration) Option {
 	return func(a *App) { a.refreshGrace = d }
 }
 
-// WithAuthRateLimit sets the per-client request budget per minute on auth routes.
+// WithAuthRateLimit sets the per-client request budget per minute on password
+// routes.
 func WithAuthRateLimit(perMinute int) Option {
 	return func(a *App) { a.rateLimit = perMinute }
+}
+
+// WithSessionRateLimit sets the per-client request budget per minute on routes
+// that need no password work.
+func WithSessionRateLimit(perMinute int) Option {
+	return func(a *App) { a.sessionRateLimit = perMinute }
+}
+
+// WithDBTimeout bounds each database step of a request.
+func WithDBTimeout(d time.Duration) Option {
+	return func(a *App) { a.dbTimeout = d }
+}
+
+// WithPasswordConcurrency limits how many bcrypt operations run at once and how
+// long a request waits for a slot before it is refused.
+func WithPasswordConcurrency(slots int, wait time.Duration) Option {
+	return func(a *App) {
+		a.passwordSlots = make(chan struct{}, slots)
+		a.passwordWait = wait
+	}
 }
 
 // WithCORSOrigins sets the browser origins allowed to call the API.
@@ -87,6 +120,12 @@ func New(s *store.Store, tokens *auth.Manager, opts ...Option) *App {
 		refreshTTL:    defaultRefreshTTL,
 		refreshGrace:  defaultRefreshGrace,
 		rateLimit:     defaultAuthRateLimit,
+
+		sessionRateLimit: defaultSessionRateLimit,
+		dbTimeout:        defaultDBTimeout,
+		// bcrypt is pure CPU, so more jobs than cores only adds latency.
+		passwordSlots: make(chan struct{}, max(2, runtime.GOMAXPROCS(0))),
+		passwordWait:  defaultPasswordWait,
 	}
 	for _, o := range opts {
 		o(app)
@@ -96,7 +135,8 @@ func New(s *store.Store, tokens *auth.Manager, opts ...Option) *App {
 		panic(err)
 	}
 	app.passwords = passwords
-	app.limiter = newIPLimiter(app.rateLimit, limiterMaxEntries, time.Now)
+	app.passwordLimit = newIPLimiter(app.rateLimit, limiterMaxEntries, time.Now)
+	app.sessionLimit = newIPLimiter(app.sessionRateLimit, limiterMaxEntries, time.Now)
 	return app
 }
 
@@ -109,12 +149,17 @@ func (a *App) Handler() http.Handler {
 	r.Get("/health", a.health)
 
 	r.Route("/auth", func(r chi.Router) {
-		r.Use(rateLimit(a.limiter, a.trust))
-		r.Post("/register", a.register)
-		r.Post("/login", a.login)
-		r.Post("/refresh", a.refresh)
-		r.Post("/logout", a.logout)
-		r.With(a.requireAuth).Get("/me", a.me)
+		r.Group(func(r chi.Router) {
+			r.Use(rateLimit(a.passwordLimit, a.trust))
+			r.Post("/register", a.register)
+			r.Post("/login", a.login)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(rateLimit(a.sessionLimit, a.trust))
+			r.Post("/refresh", a.refresh)
+			r.Post("/logout", a.logout)
+			r.With(a.requireAuth).Get("/me", a.me)
+		})
 	})
 
 	return r

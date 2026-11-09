@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -254,12 +255,67 @@ func TestLimiterKeepsLimitsWhenFull(t *testing.T) {
 	if ok, _ := l.allow(a); ok {
 		t.Error("a full map reset an exhausted address")
 	}
-	// New addresses share one bucket instead of going unlimited.
-	if ok, _ := l.allow(ipKey("203.0.113.1")); ok {
+	// Addresses beyond capacity stay limited: rotating inside the wider prefix
+	// does not buy a new bucket.
+	if ok, _ := l.allow(ipKey("198.51.100.200")); ok {
 		t.Error("addresses beyond capacity were not limited")
 	}
 	if got := l.size(); got != 2 {
 		t.Errorf("size = %d, want the map capped at 2", got)
+	}
+}
+
+// An attacker with a large IPv6 block can fill the map. That must only spend
+// their own overflow budget, not lock out every client that arrives afterwards.
+func TestLimiterOverflowIsolatesAttackerFromOtherClients(t *testing.T) {
+	clock := newFakeClock()
+	l := newIPLimiter(3, 10, clock.Now)
+
+	// One /32, with a fresh /64 per request, fills the map and drains its overflow.
+	flood := func(i int) netip.Prefix {
+		return ipKey(fmt.Sprintf("2001:db8:%x:%x::1", i>>16, i&0xffff))
+	}
+	for i := range 1000 {
+		l.allow(flood(i))
+	}
+	if got := l.size(); got != 10 {
+		t.Fatalf("size = %d, want the map full at 10", got)
+	}
+	if ok, _ := l.allow(flood(5000)); ok {
+		t.Error("the flooding /32 kept getting budget from overflow")
+	}
+
+	// Clients elsewhere still get in. One hash collision is tolerated, because
+	// the overflow table has a fixed size and a random seed.
+	others := []string{"2001:db9::1", "2001:dba::1", "2001:dbb::1", "192.0.2.1", "198.51.100.1", "203.0.113.1"}
+	refused := 0
+	for _, addr := range others {
+		if ok, _ := l.allow(ipKey(addr)); !ok {
+			refused++
+		}
+	}
+	if refused > 1 {
+		t.Errorf("%d of %d unrelated clients refused during a flood from one /32", refused, len(others))
+	}
+}
+
+func TestOverflowKey(t *testing.T) {
+	addr := netip.MustParseAddr
+	same := func(a, b string) bool { return overflowKey(limiterKey(addr(a))) == overflowKey(limiterKey(addr(b))) }
+	if !same("2001:db8:1:2::1", "2001:db8:ffff:ffff::1") {
+		t.Error("IPv6 addresses in one /32 must share an overflow key")
+	}
+	if same("2001:db8::1", "2001:db9::1") {
+		t.Error("IPv6 addresses in different /32s must not share an overflow key")
+	}
+	if !same("192.0.2.1", "192.0.2.200") {
+		t.Error("IPv4 addresses in one /24 must share an overflow key")
+	}
+	if same("192.0.2.1", "192.0.3.1") {
+		t.Error("IPv4 addresses in different /24s must not share an overflow key")
+	}
+	if overflowKey(netip.Prefix{}) != (netip.Prefix{}) {
+		t.Error("the invalid key must map to itself")
 	}
 }
 

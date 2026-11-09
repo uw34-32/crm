@@ -44,7 +44,8 @@ Settings come from the environment. `dev.sh` also reads an optional `.env` in th
 | `ACCESS_TOKEN_TTL` | `15m` | The server's built-in default |
 | `REFRESH_TOKEN_TTL` | `720h` | The server's built-in default; each rotation issues a token with a fresh lifetime |
 | `REFRESH_GRACE` | `10s` | The server's built-in default; `0s` disables retries of a spent token |
-| `AUTH_RATE_LIMIT_PER_MINUTE` | `30` | The server's built-in default; per client, on `/auth/*`; must be positive |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | `30` | The server's built-in default; per client, on `/auth/register` and `/auth/login`; must be positive |
+| `AUTH_SESSION_RATE_LIMIT_PER_MINUTE` | `600` | The server's built-in default; per client, on every other limited route; must be positive |
 | `CORS_ORIGINS` | SvelteKit, Expo web, and Tauri local origins | Comma-separated exact origins; none by default in the server; wildcards are refused |
 | `TRUSTED_PROXIES` | none | Comma-separated addresses or CIDR prefixes; forwarding headers are ignored unless the peer is listed |
 | `POSTGRES_PASSWORD` | `postgres` | Local only; applied when the volume is first created |
@@ -94,7 +95,15 @@ The exception is a retry within `REFRESH_GRACE` of the rotation, for a lost resp
 
 ### Rate limit and proxies
 
-`/auth/*` allows `AUTH_RATE_LIMIT_PER_MINUTE` requests per client, refilled continuously, and answers 429 with `Retry-After` beyond that. A client is an IPv4 address or an IPv6 /64. Limits live in the memory of one server process.
+Two budgets per client, refilled continuously, answer 429 with `Retry-After` when spent. `/auth/register` and `/auth/login` share `AUTH_RATE_LIMIT_PER_MINUTE`, which protects bcrypt. `/auth/refresh`, `/auth/logout`, and `/auth/me` share the far larger `AUTH_SESSION_RATE_LIMIT_PER_MINUTE`, because a whole team can sit behind one address. A client is an IPv4 address or an IPv6 /64. Limits live in the memory of one server process, so several processes would each grant the full budget.
+
+The limiter tracks at most 100,000 clients. Beyond that, a client falls into a fixed table of overflow buckets, chosen by a seeded hash of its IPv4 /24 or IPv6 /32. Filling the map from one block therefore drains only that block's bucket, not everyone's. A client in the attacker's block still shares its budget while the map is full, and an attacker spread over very many blocks can drain most of the table; a limit in front of the server is the answer to that.
+
+### Password work and deadlines
+
+bcrypt runs in at most as many slots as CPU cores, with a minimum of two. A request waits up to 3 seconds for a slot, then gets 503 with `Retry-After`. Unknown emails and wrong passwords wait for the same slot, so saturation does not tell them apart. Each database step of a request is limited to 5 seconds.
+
+A NUL character in any JSON string gets a 400.
 
 The client address is the connection's peer. Behind a reverse proxy, list it in `TRUSTED_PROXIES`, or every client shares the proxy's budget; `X-Forwarded-For` and `X-Forwarded-Proto` are read only from listed peers.
 
