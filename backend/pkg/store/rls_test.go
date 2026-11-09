@@ -397,7 +397,7 @@ func TestTenantTablesAreProtected(t *testing.T) {
 		t.Fatalf("CheckTenantTables: %v", err)
 	}
 	// The check must not pass because it looked at nothing.
-	for _, want := range []string{"workspaces", "workspace_members"} {
+	for _, want := range []string{"workspaces", "workspace_members", "activities"} {
 		if !slices.Contains(tables, want) {
 			t.Errorf("checked %v, which lacks %s", tables, want)
 		}
