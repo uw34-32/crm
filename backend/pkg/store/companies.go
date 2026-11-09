@@ -132,7 +132,13 @@ func (s *Store) UpdateCompany(ctx context.Context, workspaceID, id string, patch
 	return c, nil
 }
 
-// DeleteCompany soft-deletes a live company, or returns ErrCompanyNotFound.
+// DeleteCompany soft-deletes a live company, or returns ErrCompanyNotFound. Its
+// contacts stay, because they are still people the workspace knows, and lose the
+// link in the same transaction. That covers soft-deleted contacts too, so nothing
+// points at a company nobody can see. updated_at moves, so a later sync notices.
+//
+// The company's row is updated first. That waits for any link still in progress,
+// and the unlink, a new statement, then sees it. See holdLiveCompany.
 func (s *Store) DeleteCompany(ctx context.Context, workspaceID, id string) error {
 	if !validUUID(id) {
 		return ErrCompanyNotFound
@@ -147,6 +153,12 @@ func (s *Store) DeleteCompany(ctx context.Context, workspaceID, id string) error
 		}
 		if tag.RowsAffected() == 0 {
 			return ErrCompanyNotFound
+		}
+		if _, err := q.Exec(ctx, `
+			UPDATE contacts SET company_id = NULL, updated_at = now()
+			 WHERE workspace_id = $1::text::uuid AND company_id = $2::text::uuid`,
+			workspaceID, id); err != nil {
+			return fmt.Errorf("unlink contacts: %w", err)
 		}
 		return nil
 	})
