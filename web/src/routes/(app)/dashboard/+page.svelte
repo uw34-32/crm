@@ -42,28 +42,15 @@
         <h2 id="next-heading" class="section-card-title">Coming next</h2>
       </div>
       <p class="section-card-body upcoming">
-        Contacts, companies, the deal pipeline, and activities for {workspace.name} will open from here. Use the
-        workspace menu at the top to switch between teams.
+        Find the people and organizations {workspace.name} works with under <a href="/contacts">Contacts</a> and
+        <a href="/companies">Companies</a>. The deal pipeline and activities will open from here. Use the workspace
+        menu at the top to switch between teams.
       </p>
     </section>
   </div>
 {/if}
 
 <style>
-  .page-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.3px;
-    overflow-wrap: anywhere;
-  }
-
-  .page-lede {
-    margin: 4px 0 20px;
-    color: var(--text2);
-    font-size: 0.9375rem;
-  }
-
   .upcoming {
     max-width: 65ch;
     color: var(--text2);

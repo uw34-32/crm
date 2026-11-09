@@ -1,6 +1,6 @@
 # CRM
 
-A team CRM. This repository holds the backend (configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, pipelines with stages and deals, and activities) and the start of the web app: sign-in, registration, and a workspace shell. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository holds the backend (configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, pipelines with stages and deals, and activities) and the web app: sign-in, registration, a workspace shell, and contacts and companies. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
@@ -266,6 +266,8 @@ The dev server stays on port 5173 and fails rather than move, because the API's 
 | `web/src/lib/storage.js` | `localStorage`, or one stand-in that refuses everything where there is none |
 | `web/src/lib/workspaces.svelte.js`, `web/src/lib/workspaces/` | The user's workspaces and the open one |
 | `web/src/lib/components/` | Shared components |
+| `web/src/lib/api/records.js` | Contacts and companies routes of one workspace |
+| `web/src/lib/records/` | Field checks and request bodies, list paging, URL state, and the state behind each screen |
 | `web/src/routes/(app)/` | Screens that need a session, inside the app shell |
 
 ### Session and tokens
@@ -277,6 +279,25 @@ On a 401 the client refreshes once and retries the request once. Requests that f
 Tabs share the refresh token through `localStorage`, so two tabs that refresh at once, such as after a browser restores them together, would both present it, and the second would look like reuse and revoke the login. A refresh therefore runs under a Web Locks lock named `crm.refresh` that every tab of the origin shares, and reads the stored token only once it holds the lock, so a tab that waited presents the successor the previous tab stored. Each tab still makes its own refresh call, because the access token lives in each tab's memory. A browser without Web Locks refreshes without the lock and relies on the API's `REFRESH_GRACE` window for refreshes that overlap. Signing out in one tab, or a refused token there, removes the stored token, and the other tabs see the `storage` event and sign out too.
 
 Signing out calls `POST /auth/logout` and forgets the tokens even when that call fails. The open workspace is saved per user under `crm.workspace.<user id>`; when it no longer exists the app opens the first one, and a user with none is asked to create one. Route guards run in the browser only and keep screens to signed-in users; the API is what enforces access.
+
+### Contacts and companies screens
+
+The shell links Dashboard, Contacts, and Companies: in the top bar on wider screens and in a bottom tab bar on a phone, as in `contacts`. Every screen works in the open workspace. Switching workspace reloads a list, and leaves a record or form screen for its list, because a record of one workspace does not exist in another.
+
+| Path | Screen |
+| --- | --- |
+| `/contacts`, `/companies` | A searchable list, 50 rows at a time, with a button that loads the next page while `has_more` is true |
+| `/contacts/new`, `/companies/new` | Create forms; `/contacts/new?company=<id>` starts linked to that company |
+| `/contacts/<id>`, `/companies/<id>` | A record, with edit and delete; a company also lists its people |
+| `/contacts/<id>/edit`, `/companies/<id>/edit` | Edit forms |
+
+- **Search** waits 300 ms after typing, then writes `?q=` into the URL with `replaceState`, and the URL drives the request. A reload, a shared link, and the back button therefore show the same search, and an answer that arrives after a newer search is dropped. Going back from a record returns to the list as it was last searched.
+- **Forms** check the API's limits before sending, put each message under its field, and move focus to the first field with a problem. A create leaves out blank optional fields. An edit sends only the fields that changed, sends an empty string to clear an optional field (never `null`, which the API refuses on text), and sends `company_id: null` to unlink. An edit with no changes sends nothing.
+- **The company picker** searches the workspace's companies as you type. A company is linked only by choosing it from the list; the remove button, or clearing the field, unlinks it.
+- **Delete** asks first in a modal dialog that opens on Cancel, then returns to the list with a confirmation. A record that is already gone counts as deleted.
+- **Not found**: the API answers the same 404 for a record that was deleted, never existed, belongs to another workspace, or has a malformed ID, and the screen says the same for all of them.
+- **A company's people**: the contacts list has no company filter, so the company screen searches contacts for the company's name, which every linked contact matches, and keeps the ones linked to it. It looks up to four pages ahead before offering to look further. A `company_id` filter on `GET /contacts` would replace this.
+- A new page moves focus to its heading, once the record has loaded, so keyboard and screen reader users start at the content.
 
 ## Tenancy
 
