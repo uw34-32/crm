@@ -45,9 +45,9 @@ Out of scope for this feature: integration with `contacts`, email or calendar sy
 
 Route for every task: delegated direct, because each touches 2+ non-trivial files (writer trigger).
 
-- [ ] **T1 Backend skeleton.** Go module, config, migrations runner, server entry point, health route, Compose, `dev.sh`, `.env.example`, README. Accept: server boots against Compose Postgres, applies migrations, `GET /health` returns 200. Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
+- [x] **T1 Backend skeleton.** Go module, config, migrations runner, server entry point, health route, Compose, `dev.sh`, `.env.example`, README. Accept: server boots against Compose Postgres, applies migrations, `GET /health` returns 200. Checks: `go build ./...`, `go vet ./...`, `go test ./...`.
 - [x] **T2 Auth.** Users, bcrypt, access JWT, refresh token rotation with family revocation. Accept: full auth flow and reuse detection covered by tests. Checks: `go test ./...`.
-- [ ] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
+- [x] **T3 Workspaces and tenancy.** Workspaces, members, roles, membership middleware. Accept: tests prove a non-member gets 404 and role limits hold. Checks: `go test ./...`.
 - [ ] **T4 Contacts and companies.** CRUD, search, pagination, soft delete, contact-to-company link. Accept: cross-workspace isolation tests pass. Checks: `go test ./...`.
 - [ ] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
 - [ ] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
@@ -66,22 +66,18 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 
 | T1 closure and T2 | `442b607`, `4477ece`, `03c8a40`, `96c1e23`, `bce9b3a`, `d3c9df0`, `84ca825` | build, vet, gofmt clean; 169 test passes as `crm_app`, parent re-ran `go test`; auth flow, reuse revocation, CORS, and rate limit observed over HTTP | high, granted, approved and acknowledged |
 
-Reviewed boundary: `84ca825`.
+| Auth hardening and T3 | `a47fc76`, `5124905`, `4052d54`, `802a508` | build, vet, gofmt clean; 339 test passes as `crm_app`, parent re-ran `go test`; workspace, role, and last-owner flows observed over HTTP | high, review pending |
+
+Last reviewed boundary: `84ca825`.
 
 ### Open items
 
-- `.env.example` is missing: the permission settings deny writing it. The owner has the content and creates the file. This is the only item keeping T1 open.
-- T2 review warnings accepted for fixing in T3's first work unit (auth hardening):
-  - The 30-per-minute limit also covers `/auth/me` and `/auth/refresh`, so a team behind one NAT can lock itself out (`backend/pkg/app/app.go:112-117`).
-  - A retry inside the grace window spends a successor token already delivered (`backend/pkg/store/refresh_tokens.go:162-164`).
-  - Login, register, and `/auth/me` have no database deadline (`backend/pkg/app/auth.go:123`).
-  - Unbounded bcrypt concurrency (`backend/pkg/app/auth.go:134`).
-  - Family revocation on reuse is not logged (`backend/pkg/store/refresh_tokens.go:141-149`).
-  - A NUL character in input returns 500 (`backend/pkg/app/auth.go:86-88`).
-  - Overflow rate-limit bucket can lock out clients under IPv6 abuse (`backend/pkg/app/middleware.go:192-196`).
+- `.env.example` was created by the owner and lacks the optional `AUTH_SESSION_RATE_LIMIT_PER_MINUTE` (default 600). The agent's permission settings deny editing it.
+- `git fetch origin` over SSH timed out on port 22, so the remote's contents are unknown. The owner reports existing content there, so a rebase is expected before merging and pushing. Commit hashes in this file change after that rebase.
+- RLS risks from T3: it does not stop SQL injection, because arbitrary SQL can call `set_config`; it does not enforce soft delete; an owner or admin can add any registered email with no consent step.
 - Pending owner decision: register returns 409 for a taken email, which reveals accounts (`backend/pkg/app/auth.go:101-104`). Hiding it needs email verification, which is outside this feature.
 - Eight review suggestions are not scheduled.
 
 ## Next step
 
-T3 in progress through one delegated writer, starting with the auth hardening work unit.
+Finish the T3 review, resolve remote access and the rebase with the owner, then start T4.
