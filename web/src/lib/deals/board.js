@@ -89,6 +89,24 @@ export function planMove(columns, dealId, toStageId, before) {
   return { columns: next, body, from: { stageId: source.stage.id, index: found.index } };
 }
 
+/**
+ * The board with a deal back where a refused move took it from, so a failed move is
+ * undone without undoing moves of other deals made meanwhile. The index is clamped,
+ * since the old stage may have fewer deals by now.
+ * @param {Column[]} columns
+ * @param {string} dealId
+ * @param {{ stageId: string, index: number }} from
+ */
+export function undoMove(columns, dealId, from) {
+  const found = locate(columns, dealId);
+  const homeIndex = columns.findIndex((column) => column.stage.id === from.stageId);
+  if (!found || homeIndex < 0) return columns;
+  const without = removeDeal(columns, dealId);
+  const home = [...without[homeIndex].deals];
+  home.splice(Math.min(from.index, home.length), 0, { ...found.deal, stage_id: from.stageId });
+  return without.map((column, index) => (index === homeIndex ? { ...column, deals: renumbered(home) } : column));
+}
+
 /** The board with one deal replaced by what the API returned for it. @param {Column[]} columns @param {Deal} deal */
 export function replaceDeal(columns, deal) {
   return columns.map((column) => ({ ...column, deals: column.deals.map((d) => (d.id === deal.id ? { ...d, ...deal } : d)) }));
@@ -99,6 +117,25 @@ export function removeDeal(columns, dealId) {
   return columns.map((column) =>
     column.deals.some((deal) => deal.id === dealId) ? { ...column, deals: renumbered(column.deals.filter((deal) => deal.id !== dealId)) } : column
   );
+}
+
+/**
+ * The board with a later page of deals added to their columns: new deals take their
+ * place by position among those shown, deals already shown are skipped, and the
+ * named stages learn whether more remain.
+ * @param {Column[]} columns
+ * @param {Deal[]} deals
+ * @param {Record<string, boolean>} hasMore
+ */
+export function appendDeals(columns, deals, hasMore) {
+  return columns.map((column) => {
+    const shown = new Set(column.deals.map((deal) => deal.id));
+    const added = deals.filter((deal) => deal.stage_id === column.stage.id && !shown.has(deal.id));
+    const more = column.stage.id in hasMore ? hasMore[column.stage.id] : column.hasMore;
+    if (added.length === 0 && more === column.hasMore) return column;
+    const merged = [...column.deals, ...added].sort((a, b) => a.position - b.position);
+    return { ...column, deals: renumbered(merged), hasMore: more };
+  });
 }
 
 /** A move into a lost stage needs a reason; a move within one keeps the reason it has. @param {Deal} deal @param {Stage} stage */

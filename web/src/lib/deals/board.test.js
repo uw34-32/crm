@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildColumns, needsLostReason, planMove, removeDeal, replaceDeal, stageTotals } from './board.js';
+import { buildColumns, needsLostReason, planMove, removeDeal, replaceDeal, stageTotals, undoMove, appendDeals } from './board.js';
 
 /** @type {import('./board.js').Stage[]} */
 const stages = [
@@ -113,5 +113,40 @@ describe('asking for a lost reason', () => {
     expect(needsLostReason(deal('a', 's1', 0), lost)).toBe(true);
     expect(needsLostReason(deal('a', 'lost', 0), lost)).toBe(false);
     expect(needsLostReason(deal('a', 's1', 0), stages[2])).toBe(false);
+  });
+});
+
+describe('undoing a refused move', () => {
+  it('puts the deal back where it came from, whatever moved meanwhile', () => {
+    const columns = buildColumns(stages, deals);
+    const plan = planMove(columns, 'a', 's2', null);
+    if (!plan) throw new Error('expected a plan');
+    const undone = undoMove(plan.columns, 'a', plan.from);
+    expect(undone[0].deals.map((d) => [d.id, d.stage_id, d.position])).toEqual([['a', 's1', 0], ['b', 's1', 1]]);
+    expect(undone[1].deals.map((d) => d.id)).toEqual(['c']);
+  });
+
+  it('clamps to the end when the old stage has fewer deals than before', () => {
+    const columns = buildColumns(stages, deals);
+    const plan = planMove(columns, 'b', 's2', null);
+    if (!plan) throw new Error('expected a plan');
+    const shrunk = removeDeal(plan.columns, 'a');
+    expect(undoMove(shrunk, 'b', plan.from)[0].deals.map((d) => [d.id, d.position])).toEqual([['b', 0]]);
+  });
+
+  it('leaves the board alone when the deal or its old stage is gone', () => {
+    const columns = buildColumns(stages, deals);
+    expect(undoMove(columns, 'nope', { stageId: 's1', index: 0 })).toBe(columns);
+    expect(undoMove(columns, 'a', { stageId: 'gone', index: 0 })).toBe(columns);
+  });
+});
+
+describe('appending a later page of closed deals', () => {
+  it('adds deals to their columns in position order, skips ones already shown, and updates what has more', () => {
+    const columns = buildColumns(stages, deals, { hasMore: { won: true } });
+    const next = appendDeals(columns, [deal('w2', 'won', 2), deal('w', 'won', 0), deal('w1', 'won', 1)], { won: false });
+    expect(next[2].deals.map((d) => [d.id, d.position])).toEqual([['w', 0], ['w1', 1], ['w2', 2]]);
+    expect(next[2].hasMore).toBe(false);
+    expect(columns[2].deals.length).toBe(1);
   });
 });

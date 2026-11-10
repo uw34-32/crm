@@ -1,5 +1,5 @@
 <script>
-  import { Building2, LayoutDashboard, LogOut, Users } from '@lucide/svelte';
+  import { Building2, Kanban, LayoutDashboard, LogOut, Users } from '@lucide/svelte';
   import { tick } from 'svelte';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -16,11 +16,15 @@
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/contacts', label: 'Contacts', icon: Users },
-    { href: '/companies', label: 'Companies', icon: Building2 }
+    { href: '/companies', label: 'Companies', icon: Building2 },
+    { href: '/pipeline', label: 'Pipeline', icon: Kanban, also: '/deals' }
   ];
 
-  /** @param {string} href */
-  const isCurrent = (href) => page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
+  /** @param {string} path @param {string} href */
+  const under = (path, href) => path === href || path.startsWith(`${href}/`);
+
+  /** A deal's own pages belong to the pipeline. @param {(typeof navItems)[number]} item */
+  const isCurrent = (item) => under(page.url.pathname, item.href) || (item.also !== undefined && under(page.url.pathname, item.also));
 
   /** @type {HTMLElement | null} */
   let main = $state(null);
@@ -71,7 +75,7 @@
       </a>
       <nav class="topnav" aria-label="Main">
         {#each navItems as item (item.href)}
-          <a href={item.href} class="topnav-link" aria-current={isCurrent(item.href) ? 'page' : undefined}>{item.label}</a>
+          <a href={item.href} class="topnav-link" aria-current={isCurrent(item) ? 'page' : undefined}>{item.label}</a>
         {/each}
       </nav>
       <WorkspaceSwitcher />
@@ -103,7 +107,7 @@
   <nav class="tabbar" aria-label="Main">
     {#each navItems as item (item.href)}
       {@const Icon = item.icon}
-      <a href={item.href} class="tab" aria-current={isCurrent(item.href) ? 'page' : undefined}>
+      <a href={item.href} class="tab" aria-current={isCurrent(item) ? 'page' : undefined}>
         <Icon size={22} aria-hidden="true" />
         <span>{item.label}</span>
       </a>

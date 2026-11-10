@@ -268,6 +268,9 @@ The dev server stays on port 5173 and fails rather than move, because the API's 
 | `web/src/lib/components/` | Shared components |
 | `web/src/lib/api/records.js` | Contacts and companies routes of one workspace |
 | `web/src/lib/records/` | Field checks and request bodies, list paging, URL state, and the state behind each screen |
+| `web/src/lib/api/crm.js` | Pipelines, deals, activities, and members routes of one workspace |
+| `web/src/lib/deals/` | Money in minor units, the board model, deal fields, and the pipeline URL state |
+| `web/src/lib/activities/` | Timeline grouping, task due state, edit permission, and activity fields |
 | `web/src/routes/(app)/` | Screens that need a session, inside the app shell |
 
 ### Session and tokens
@@ -298,6 +301,17 @@ The shell links Dashboard, Contacts, and Companies: in the top bar on wider scre
 - **Not found**: the API answers the same 404 for a record that was deleted, never existed, belongs to another workspace, or has a malformed ID, and the screen says the same for all of them.
 - **A company's people**: the contacts list has no company filter, so the company screen searches contacts for the company's name, which every linked contact matches, and keeps the ones linked to it. It looks up to four pages ahead before offering to look further. A `company_id` filter on `GET /contacts` would replace this.
 - A new page moves focus to its heading, once the record has loaded, so keyboard and screen reader users start at the content.
+
+### Pipeline board
+
+The shell adds Pipeline to the navigation. `/pipeline` shows one column per stage of a pipeline, in stage order, with the stage color, its deal count, and its value per currency. A deal card shows the title, value, company or contact name, and owner, and opens the deal.
+
+- **Pipeline** comes from `?pipeline=`, so a reload and the back button keep it. A selector appears when the workspace has more than one. A missing or unknown ID opens the first pipeline and rewrites the URL.
+- **Loading**: all open deals of the pipeline, 200 at a time (up to 25 pages; a notice says so if there are more). Won and lost columns load the first 50 deals in board order and offer "Load more won deals" or "Load more lost deals". A column with more than it shows has a `+` after its count, and its total covers only the deals shown.
+- **Moving**: drag a card to a column, above or below another card, or press the Move button on a card (a dialog with the stage and the place in it, for keyboard and touch). The board changes at once and `POST .../move` follows with the dense position among the deals shown. If the API refuses, the card goes back to where it was, other moves made meanwhile stay, and a toast gives the reason. A 404 reloads the board. A deal with a move in flight cannot be moved again.
+- **Lost stage**: moving a deal into a lost stage asks for the reason first and sends it as `lost_reason`. Moving within a lost stage does not ask.
+- Dropping at the end of a won or lost column that has more pages sends no `position`, so the API puts the deal last.
+- Money is shown from `value_minor` and the currency's own decimals (yen has none, dinars three).
 
 ## Tenancy
 
