@@ -8,6 +8,7 @@ import { page } from '$app/state';
 import { MAX_PAGE, dealsApi, pipelinesApi } from '../api/crm.js';
 import { toSentence } from '../forms.js';
 import { isMissing } from '../records/load.js';
+import { rememberList } from '../records/url.js';
 import { api } from '../session.svelte.js';
 import { showToast } from '../toast.svelte.js';
 import { workspaces } from '../workspaces.svelte.js';
@@ -139,6 +140,7 @@ export function boardScreen() {
   $effect(() => {
     const id = workspaces.current?.id;
     const wanted = pipelineFromUrl(page.url);
+    rememberList('pipeline', page.url);
     if (!id) return;
     untrack(() => {
       if (requested.workspaceId === id && requested.pipelineId === wanted && board.status !== 'error') return;

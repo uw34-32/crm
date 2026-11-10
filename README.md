@@ -313,6 +313,19 @@ The shell adds Pipeline to the navigation. `/pipeline` shows one column per stag
 - Dropping at the end of a won or lost column that has more pages sends no `position`, so the API puts the deal last.
 - Money is shown from `value_minor` and the currency's own decimals (yen has none, dinars three).
 
+### Deal screens
+
+| Path | Screen |
+| --- | --- |
+| `/deals/new` | Create form; the board links with `?pipeline=<id>` so the deal starts in the pipeline on screen |
+| `/deals/<id>` | Fields, a stage control, links to the company and contact, the lost reason when lost, edit and delete |
+| `/deals/<id>/edit` | Edit form |
+
+- **New deal** takes a title, value, currency (USD to start), pipeline, starting open stage (the first stage by default), expected close date, company, contact, and owner (the caller by default). The value is typed in the currency's main unit (`1250.50`) and sent as minor units; a currency with no decimals (JPY) takes whole numbers. The company and contact pickers are one component, `RecordPicker`, with `CompanyPicker` and `ContactPicker` as thin wrappers.
+- **Edit** sends only the fields that changed and `null` to clear the date, the company, the contact, or the owner. It never sends the pipeline or stage; those change only by moving the deal.
+- **Stage control** on the deal page moves the deal to the end of the chosen stage. A lost stage asks for the reason first.
+- **Delete** and **not found** behave as for contacts and companies.
+
 ## Tenancy
 
 A workspace is the tenant boundary. A user can belong to many, with one role in each:

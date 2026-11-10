@@ -17,10 +17,10 @@ export function withSearch(url, q) {
   return url.pathname + (query ? `?${query}` : '');
 }
 
-/** @typedef {'contacts' | 'companies'} Kind */
+/** @typedef {'contacts' | 'companies' | 'pipeline'} Kind */
 
 /** @type {Record<Kind, string>} */
-const lastList = { contacts: '/contacts', companies: '/companies' };
+const lastList = { contacts: '/contacts', companies: '/companies', pipeline: '/pipeline' };
 
 /** Remembers the list a person last saw, so going back keeps their search. @param {Kind} kind @param {URL} url */
 export function rememberList(kind, url) {
