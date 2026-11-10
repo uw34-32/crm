@@ -54,7 +54,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
 - [x] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
 - [x] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
-- [ ] **T9 Web pipeline and activities.** Kanban board with stage moves, deal detail, activity timeline. Checks: `pnpm check`, `pnpm build`, browser run.
+- [x] **T9 Web pipeline and activities.** Kanban board with stage moves, deal detail, activity timeline. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T10 Native shell and auth.** Expo and React Native scaffold, API client with refresh, secure token storage, login and register, workspace switcher. Checks: typecheck, unit tests, app run.
 - [ ] **T11 Native CRM screens.** Contacts, companies, pipeline, deals, and activities. Checks: typecheck, unit tests, app run.
 - [ ] **T12 Tauri desktop.** Tauri app in `native-client/src-tauri` wrapping the Expo web export, as in `contacts`. Accept: desktop build launches and logs in. Checks: Tauri build, app run.
@@ -84,6 +84,20 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 The three T7 warnings are fixed in `4539005`: tabs refresh in turn under a Web Lock and read the latest stored token once they hold it (browsers without Web Locks rely on `REFRESH_GRACE`); signing out clears the restore error; one shared no-storage fallback in `web/src/lib/storage.js`.
 
 T8 decisions: a company's people are found by searching contacts by the company name and filtering on `company_id` on the client, because `GET /contacts` has no `company_id` filter (a backend filter would replace this); paging uses "Load more"; search is written to `?q=` after 300 ms, replacing the history entry; a company is linked only by choosing it in the picker and unlinked by clearing the field or the remove button; an edit with no changes sends no request; the confirm dialog uses the native `<dialog>`; "New contact" and "New company" are header buttons. `PRODUCT.md` was not written; the `contacts` design stood in for it.
+
+| T9 | `0e9a483`, `3ffdac4`, `6471139`, `e42c2c0`, `2c3e4f8` | web `pnpm check` clean, 179 Vitest passes, `pnpm build` ok; parent re-ran web tests; board, drag and reorder, keyboard move, lost reason, rollback on a failed move, deal create, edit, detail, delete, not found, timeline for each kind, complete and reopen, phone width, and dark mode observed in a browser | medium; assess on the whole range said `under_budget` at 3,852 lines, so the commits were reviewed separately with owner consent: 4 reviews (the last covers `e42c2c0` and `2c3e4f8` together), all approved and acknowledged with no correction |
+
+T9 decisions: all open deals load (200 per page, up to 25 pages, with a notice beyond that); won and lost columns show the first 50 deals with "Load more"; a move's position is the dense index among the loaded deals of the target column, and appending to a closed column with unloaded pages sends no position; a failed move puts the card back at its old stage and index (`undoMove`), keeps other moves, shows the API reason, and reloads on 404; a drag into a lost stage opens the move dialog with the place preset, asking only for the reason; the deal page stage control moves a deal to the end of the stage; currency defaults to USD and the value is typed in the main unit and converted by the currency's decimals; one `RecordPicker` serves companies and contacts; edit never sends the pipeline or stage; the timeline shows only activities linked to that record, 50 per page; `/pipeline` widens `main` to 1680px; an unknown `?pipeline=` opens the first pipeline.
+
+T9 review warnings, not yet fixed:
+
+- Parsing a local due time and a PATCH with an invalid due or cleared value (`web/src/lib/activities/fields.js:35-40`, `:84-86`; `web/src/lib/deals/fields.js:97-98`).
+- The move flow is untested, and the position select is disabled in the dialog (`web/src/lib/deals/board.svelte.js:150-165`; `web/src/lib/components/MoveDealDialog.svelte:80-85`).
+- Clearing the owner on edit, and a stale stage select on the deal page (`web/src/lib/components/DealForm.svelte:44-46`; `web/src/routes/(app)/deals/[id]/+page.svelte:70-72`).
+- A race between editing and cancelling an activity, and a stale "now" for due state (`web/src/lib/components/ActivityTimeline.svelte:149`, `:38`).
+- No component tests for the deal form or the timeline.
+
+T9 follow-ups not built: creating, renaming, reordering, and deleting pipelines and stages; deal filters beyond the pipeline; reports; the dashboard still says the pipeline is coming next; the timeline composer is tall.
 
 T8 review warnings, not yet fixed:
 
@@ -135,4 +149,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 was merged directly to `main` and pushed at `18f43d5` (owner decision, 2026-11-09; last reviewed boundary `ae5665f`). Next: T9, web pipeline and activities. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 was merged directly to `main` and pushed at `18f43d5` (owner decision, 2026-11-09; last reviewed boundary `ae5665f`). T9 is complete on `feat/crm-web-pipeline` and reviewed (last reviewed boundary `2c3e4f8`); delivery awaits the owner. Next: T10, the Expo shell and auth. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
