@@ -1,6 +1,6 @@
 <script>
   import { Plus } from '@lucide/svelte';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import DealCard from '$lib/components/DealCard.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import MoveDealDialog from '$lib/components/MoveDealDialog.svelte';
@@ -104,7 +104,13 @@
   function moveFromDialog({ stageId, before, lostReason }) {
     const deal = moving?.deal;
     moving = null;
-    if (deal) screen.move(deal.id, stageId, before, lostReason);
+    if (!deal) return;
+    screen.move(deal.id, stageId, before, lostReason);
+    // The card may have been rebuilt in another column; keyboard users stay on it.
+    tick().then(() => {
+      const button = document.querySelector(`[data-deal-id="${deal.id}"] button`);
+      if (button instanceof HTMLElement) button.focus();
+    });
   }
 
   /** @param {Column} column */
@@ -265,6 +271,8 @@
 
   /* Columns scroll sideways inside the page, which itself never does. */
   .board {
+    /* The containing block of the screen-reader-only text inside, so it cannot widen the page. */
+    position: relative;
     display: flex;
     gap: 12px;
     align-items: flex-start;

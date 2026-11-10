@@ -89,7 +89,7 @@
     </div>
   </header>
 
-  <main id="main" tabindex="-1" bind:this={main}>
+  <main id="main" class:wide={page.url.pathname === '/pipeline'} tabindex="-1" bind:this={main}>
     {#if workspaces.status === 'error'}
       <ErrorNotice message={workspaces.error} onretry={loadWorkspaces} />
     {:else if workspaces.status === 'ready'}
@@ -265,6 +265,11 @@
     max-width: 960px;
     margin: 0 auto;
     padding: 24px 16px calc(40px + env(safe-area-inset-bottom));
+  }
+
+  /* A board of six columns needs more than a form's width. */
+  main.wide {
+    max-width: 1680px;
   }
 
   main:focus {
