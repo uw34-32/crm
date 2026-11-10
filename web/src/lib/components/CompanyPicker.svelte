@@ -70,6 +70,8 @@
   }
 
   function oninput() {
+    // Unlink right away so a submit before the blur handler runs never sends the old company.
+    if (!query.trim()) value = null;
     open = true;
     searchLater(query);
   }
