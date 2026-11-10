@@ -53,7 +53,7 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 - [x] **T5 Pipelines and deals.** Pipelines, ordered stages, deals, stage moves; a default pipeline on workspace creation. Accept: isolation and move tests pass. Checks: `go test ./...`.
 - [x] **T6 Activities.** Activities linked to contact, company, or deal, with due and completed state. Accept: isolation and link validation tests pass. Checks: `go test ./...`.
 - [x] **T7 Web shell and auth.** SvelteKit scaffold, API client with refresh, login and register, workspace switcher. Accept: login reaches the app shell in a browser. Checks: `pnpm check`, `pnpm build`.
-- [ ] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
+- [x] **T8 Web contacts and companies.** List, search, create, edit, delete. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T9 Web pipeline and activities.** Kanban board with stage moves, deal detail, activity timeline. Checks: `pnpm check`, `pnpm build`, browser run.
 - [ ] **T10 Native shell and auth.** Expo and React Native scaffold, API client with refresh, secure token storage, login and register, workspace switcher. Checks: typecheck, unit tests, app run.
 - [ ] **T11 Native CRM screens.** Contacts, companies, pipeline, deals, and activities. Checks: typecheck, unit tests, app run.
@@ -78,6 +78,21 @@ Route for every task: delegated direct, because each touches 2+ non-trivial file
 | T5 follow-ups and T6 | `743a361`, `62c2286`, `b00fd92`, `9e941bd`, `ec47be6` | build, vet, gofmt clean; 928 test passes as `crm_app`, parent re-ran `go test`; timeline, task completion, unlink on delete, 409 on last pipeline, and cross-workspace 404 observed over HTTP | medium, granted, one review of the range approved and acknowledged |
 
 | T6 fixes and T7 | `75a2724`, `d923bc9`, `b58e513` | backend 950 test passes; web `pnpm check` clean, 59 Vitest passes, `pnpm build` ok; parent re-ran web tests and backend `app` and `store`; register, workspaces, reload, logout, and phone width observed in a browser | high, granted, four lenses approved and acknowledged |
+
+| T7 fixes and T8 | `4539005`, `98c0fbf`, `f5ab0fd`, `19978d5`, `ae5665f` | web `pnpm check` clean, 114 Vitest passes, `pnpm build` ok; parent re-ran web tests; create, edit (clear, unlink, relink), paging, search in the URL, delete dialog, not found, workspace switch, phone width, and two tabs restoring together observed in a browser | medium; assess on the whole range said `under_budget` at 3,228 lines, so each commit was reviewed separately with owner consent: 4 of 4 approved and acknowledged, the fourth after one correction for a critical finding (clearing the company picker did not unlink before submit, fixed in `ae5665f`) |
+
+The three T7 warnings are fixed in `4539005`: tabs refresh in turn under a Web Lock and read the latest stored token once they hold it (browsers without Web Locks rely on `REFRESH_GRACE`); signing out clears the restore error; one shared no-storage fallback in `web/src/lib/storage.js`.
+
+T8 decisions: a company's people are found by searching contacts by the company name and filtering on `company_id` on the client, because `GET /contacts` has no `company_id` filter (a backend filter would replace this); paging uses "Load more"; search is written to `?q=` after 300 ms, replacing the history entry; a company is linked only by choosing it in the picker and unlinked by clearing the field or the remove button; an edit with no changes sends no request; the confirm dialog uses the native `<dialog>`; "New contact" and "New company" are header buttons. `PRODUCT.md` was not written; the `contacts` design stood in for it.
+
+T8 review warnings, not yet fixed:
+
+- A hung refresh holds the cross-tab lock, and a refused lock request is not mapped to an app error (`web/src/lib/api/client.js:124-126`).
+- `web/src/lib/records/screens.svelte.js:83-108` and `:25-77`, and `web/src/lib/records/fields.js:139-142` (reliability warnings R3-001 to R3-003).
+- A click on the confirm dialog's padding cancels it (`web/src/lib/components/ConfirmDialog.svelte:53-55`).
+- An invalid date throws on the company page (`web/src/routes/(app)/companies/[id]/+page.svelte:188`), and the page can read a null company after an await (`:72-73`).
+- A stale active option can be chosen with Enter in the picker (`web/src/lib/components/CompanyPicker.svelte:72-75`), and a failed company preset on a new contact is silent (`web/src/routes/(app)/contacts/new/+page.svelte:22-26`).
+- The screens and the picker have no component tests.
 
 The two T6 warnings are fixed: `lost_reason` is judged by the target stage under the pipeline lock, and `due_at` is checked at microsecond precision against the schema bounds.
 
@@ -120,4 +135,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 in progress on `feat/crm-web-contacts` through one delegated writer, starting with the three T7 warnings. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 is complete on `feat/crm-web-contacts` and reviewed (last reviewed boundary `ae5665f`); delivery awaits the owner. Next: T9, web pipeline and activities. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
