@@ -1,6 +1,6 @@
 # CRM
 
-A team CRM. This repository holds the backend (configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, pipelines with stages and deals, and activities) and the web app: sign-in, registration, a workspace shell, and contacts and companies. The plan lives in `odd/tasks/crm-foundation.md`.
+A team CRM. This repository holds the backend (configuration, migrations, database roles, a health route, accounts with token auth, workspaces with members and Row-Level Security, contacts and companies, pipelines with stages and deals, and activities) and the web app: sign-in, registration, a workspace shell, contacts and companies, a pipeline board, deals, and activity timelines. The plan lives in `odd/tasks/crm-foundation.md`.
 
 ## Stack
 
@@ -267,6 +267,7 @@ The dev server stays on port 5173 and fails rather than move, because the API's 
 | `web/src/lib/workspaces.svelte.js`, `web/src/lib/workspaces/` | The user's workspaces and the open one |
 | `web/src/lib/components/` | Shared components |
 | `web/src/lib/api/records.js` | Contacts and companies routes of one workspace |
+| `web/src/lib/members.svelte.js` | The open workspace's members, for owners and assignees |
 | `web/src/lib/records/` | Field checks and request bodies, list paging, URL state, and the state behind each screen |
 | `web/src/lib/api/crm.js` | Pipelines, deals, activities, and members routes of one workspace |
 | `web/src/lib/deals/` | Money in minor units, the board model, deal fields, and the pipeline URL state |
@@ -325,6 +326,16 @@ The shell adds Pipeline to the navigation. `/pipeline` shows one column per stag
 - **Edit** sends only the fields that changed and `null` to clear the date, the company, the contact, or the owner. It never sends the pipeline or stage; those change only by moving the deal.
 - **Stage control** on the deal page moves the deal to the end of the chosen stage. A lost stage asks for the reason first.
 - **Delete** and **not found** behave as for contacts and companies.
+
+### Activity timeline
+
+A deal's page, a contact's page, and a company's page end with the same timeline (`ActivityTimeline`), filtered by `deal_id`, `contact_id`, or `company_id`.
+
+- Activities come newest first, 50 at a time with "Load older activity", grouped by the local day they were created (Today, Yesterday, then the date).
+- The form on top adds a note, call, meeting, or task. A task also takes a due date and time (local, sent as an instant) and an assignee from the workspace's members. Only a task has them, so the other kinds never send them.
+- Anyone completes and reopens a task from its check button. A task shows Overdue or Due today against its due time.
+- Edit and delete show only to the author, an owner, or an admin, as the API rules, and a 403 or 404 from the API is still handled. A delete asks first.
+- A contact's or company's timeline lists activities linked to that record itself, not those of its deals.
 
 ## Tenancy
 

@@ -3,6 +3,7 @@
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import ActivityTimeline from '$lib/components/ActivityTimeline.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import NotFound from '$lib/components/NotFound.svelte';
@@ -184,6 +185,8 @@
           {/if}
         {/if}
       </section>
+
+      <ActivityTimeline workspaceId={screen.workspaceId} link={{ company_id: company.id }} subjectName={company.name} />
 
       <p class="detail-meta">Added {date.format(new Date(company.created_at))} · Updated {date.format(new Date(company.updated_at))}</p>
     </div>

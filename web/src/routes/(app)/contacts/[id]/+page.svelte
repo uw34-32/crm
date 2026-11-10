@@ -2,6 +2,7 @@
   import { ArrowLeft, Pencil, Trash2 } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import ActivityTimeline from '$lib/components/ActivityTimeline.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import NotFound from '$lib/components/NotFound.svelte';
@@ -112,6 +113,8 @@
           <p class="section-card-body muted">No email, phone, or company yet. <a href="/contacts/{contact.id}/edit">Add details</a></p>
         {/if}
       </section>
+
+      <ActivityTimeline workspaceId={screen.workspaceId} link={{ contact_id: contact.id }} subjectName={name} />
 
       <p class="detail-meta">Added {date.format(new Date(contact.created_at))} · Updated {date.format(new Date(contact.updated_at))}</p>
     </div>

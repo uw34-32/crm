@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { dealsApi, pipelinesApi } from '$lib/api/crm.js';
+  import ActivityTimeline from '$lib/components/ActivityTimeline.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import MoveDealDialog from '$lib/components/MoveDealDialog.svelte';
@@ -208,6 +209,8 @@
           </div>
         </dl>
       </section>
+
+      <ActivityTimeline workspaceId={screen.workspaceId} link={{ deal_id: deal.id }} subjectName={deal.title} />
 
       <p class="detail-meta">Added {date.format(new Date(deal.created_at))} · Updated {date.format(new Date(deal.updated_at))}</p>
     </div>
