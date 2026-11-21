@@ -85,6 +85,8 @@ export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Prom
   useEffect(() => {
     void load();
     return () => {
+      // A counter, not a node: it ends the load that is still waiting.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       generation.current++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

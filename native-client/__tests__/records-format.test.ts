@@ -22,7 +22,6 @@ describe('names', () => {
 
 describe('initials of letters that grow when capitalized', () => {
   it('keeps one letter per word', () => {
-    const { initials } = require('../src/lib/records/format');
     expect(initials('ßen Müller')).toBe('SM');
   });
 });

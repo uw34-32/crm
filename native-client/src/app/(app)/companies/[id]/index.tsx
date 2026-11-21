@@ -53,6 +53,8 @@ export default function CompanyDetail() {
       current = false;
       mine.stop();
     };
+    // `company` itself changes on every refresh; its id and name are what the pager uses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.id, company?.name, workspaceId, store, pager, version, gone]);
 
   const [confirming, setConfirming] = useState(false);
