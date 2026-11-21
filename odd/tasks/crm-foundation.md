@@ -101,7 +101,6 @@ T9 follow-ups not built: creating, renaming, reordering, and deleting pipelines 
 
 T8 review warnings, not yet fixed:
 
-- A hung refresh holds the cross-tab lock, and a refused lock request is not mapped to an app error (`web/src/lib/api/client.js:124-126`).
 - `web/src/lib/records/screens.svelte.js:83-108` and `:25-77`, and `web/src/lib/records/fields.js:139-142` (reliability warnings R3-001 to R3-003).
 - A click on the confirm dialog's padding cancels it (`web/src/lib/components/ConfirmDialog.svelte:53-55`).
 - An invalid date throws on the company page (`web/src/routes/(app)/companies/[id]/+page.svelte:188`), and the page can read a null company after an await (`:72-73`).
@@ -112,11 +111,8 @@ The two T6 warnings are fixed: `lost_reason` is judged by the target stage under
 
 T7 decisions: access token in memory and refresh token in `localStorage`; a refresh that fails for any reason other than a refused token keeps the session; Kit 2 and Vite 7, matching `contacts`; English only, with no i18n layer; the dev server is fixed to port 5173 for CORS; `VITE_API_URL` defaults to `http://localhost:8085`.
 
-T7 review warnings, not yet fixed:
+T7 review warnings are fixed: the cross-tab refresh lock and the restore error on sign-out in `4539005`, and the shared no-storage fallback in `storage.js`. The T8 refresh warnings are fixed in the working tree: a refresh times out after 15 seconds and keeps the token, and a refused lock request falls back to rotating without the lock.
 
-- Single-flight refresh covers one tab only, so tabs restoring together can reuse one refresh token and trigger family revocation (`web/src/lib/api/client.js:100-109`).
-- After a failed restore, signing out leaves the restore error screen up (`web/src/lib/session.svelte.js:91-95`).
-- Two divergent no-storage fallbacks (`web/src/lib/workspaces.svelte.js:11-18`).
 
 T5 follow-ups are fixed: the last live pipeline returns 409, the blank `lost_reason` case, the README table, the two weak tests, and invalid UTF-8 on contacts and companies.
 
@@ -149,4 +145,4 @@ T4 decisions: soft-deleting a company clears its contacts' links; every member c
 
 ## Next step
 
-T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 was merged directly to `main` and pushed at `18f43d5` (owner decision, 2026-11-09; last reviewed boundary `ae5665f`). T9 is complete on `feat/crm-web-pipeline` and reviewed (last reviewed boundary `2c3e4f8`); delivery awaits the owner. Next: T10, the Expo shell and auth. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
+T4 was merged directly to `main` and pushed at `636075b` (owner decision, 2026-11-09). T5 was merged directly to `main` and pushed at `ef8c086` (owner decision, 2026-11-09). T6 was merged directly to `main` and pushed at `1f24dc4` (owner decision, 2026-11-09). The backend, T1 through T6, is complete. T7 was merged directly to `main` and pushed at `b103032` (owner decision, 2026-11-09). T8 was merged directly to `main` and pushed at `18f43d5` (owner decision, 2026-11-09; last reviewed boundary `ae5665f`). T9 was merged directly to `main` and pushed at `3ff8523` (owner decision, 2026-11-10; last reviewed boundary `2c3e4f8`). Next: T10, the Expo shell and auth. Clients follow the visual design of `contacts` (owner decision, 2026-11-09): its `DESIGN.md`, `.impeccable/design.json`, and web components. `origin` uses SSH on port 443 because port 22 times out.
