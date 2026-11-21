@@ -42,20 +42,21 @@ export default function CompanyDetail() {
   });
   const people = useStore(store);
 
-  // The pager filters on this company's ID, so it is built once the company is known.
+  // The pager filters on this company's ID, so it is built once the company is known. It
+  // depends on the id and name, not the record, which is replaced on every refresh.
+  const companyId = company?.id;
+  const companyName = company?.name;
   useEffect(() => {
-    if (!company || !workspaceId || gone) return;
-    const mine = createPager(store, (params) => contactsApi.list(workspaceId, params), { keep: isPersonOf(company.id) });
+    if (!companyId || companyName === undefined || !workspaceId || gone) return;
+    const mine = createPager(store, (params) => contactsApi.list(workspaceId, params), { keep: isPersonOf(companyId) });
     pager.current = mine;
     let current = true;
-    void loadPeople(mine, store, company.name, () => current);
+    void loadPeople(mine, store, companyName, () => current);
     return () => {
       current = false;
       mine.stop();
     };
-    // `company` itself changes on every refresh; its id and name are what the pager uses.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company?.id, company?.name, workspaceId, store, pager, version, gone]);
+  }, [companyId, companyName, workspaceId, store, pager, version, gone]);
 
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);

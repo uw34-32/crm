@@ -450,11 +450,11 @@ cd native-client
 pnpm install
 pnpm start          # Expo dev server; press a, i, or w for Android, iOS, or web
 pnpm typecheck
-pnpm lint           # eslint-config-expo on ESLint 9 (eslint-plugin-react does not support 10 yet)
+pnpm lint           # expo lint . (eslint-config-expo on ESLint 9; eslint-plugin-react does not support 10 yet)
 pnpm test
 ```
 
-The lint turns off the four React Compiler rules of `eslint-plugin-react-hooks` (`refs`, `set-state-in-effect`, `immutability`, `use-memo`): the app does not use the compiler and they flag patterns it uses on purpose, like a ref holding the latest callback. The rules of hooks and `exhaustive-deps` stay on.
+The lint turns off the four React Compiler rules of `eslint-plugin-react-hooks` (`refs`, `set-state-in-effect`, `immutability`, `use-memo`) only in the nine files listed in `eslint.config.js`, which use those patterns on purpose (a ref holding the latest callback, state reset when a prop changes); the app does not use the compiler. Everywhere else they stay on, as do the rules of hooks and `exhaustive-deps`. Nothing runs the lint automatically yet: there is no CI, so run `pnpm lint`, `pnpm typecheck`, and `pnpm test` before merging.
 
 The app calls the API at `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by default. An Android emulator reaches the host at `http://10.0.2.2:8085`, and a phone needs the computer's address on the network. Expo web runs on port 8081, which `dev.sh` already allows in `CORS_ORIGINS`; native requests send no `Origin` header.
 

@@ -39,7 +39,7 @@
     "export:web": "expo export --platform web",
     "desktop": "tauri dev",
     "desktop:build": "node scripts/desktop-build.mjs",
-    "lint": "eslint ."
+    "lint": "expo lint ."
   },
   "private": true,
   "jest": {
