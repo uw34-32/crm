@@ -35,7 +35,16 @@ export default function AppLayout() {
   return (
     <>
       {list.length === 0 && pathname !== '/workspaces/new' ? <Redirect href="/workspaces/new" /> : null}
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="workspaces/new" />
+        <Stack.Screen name="contacts/new" />
+        <Stack.Screen name="contacts/[id]/index" />
+        <Stack.Screen name="contacts/[id]/edit" />
+        <Stack.Screen name="companies/new" />
+        <Stack.Screen name="companies/[id]/index" />
+        <Stack.Screen name="companies/[id]/edit" />
+      </Stack>
     </>
   );
 }

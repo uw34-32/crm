@@ -443,7 +443,7 @@ Add `backend/pkg/migrate/migrations/NNN_name.sql`. Pending files run in version 
 
 ## Native app
 
-`native-client/` is an Expo (SDK 58) app with Expo Router, built with pnpm. So far it has the shell and auth: sign-in, registration, a workspace switcher, creating a workspace, and sign-out. Contacts, companies, the pipeline, deals, and activities come next. It colors and types like the web app, with light and dark themes that follow the system setting.
+`native-client/` is an Expo (SDK 58) app with Expo Router, built with pnpm. So far it has the shell and auth (sign-in, registration, a workspace switcher, creating a workspace, and sign-out) and contacts and companies: a searchable, paged list of each, create, edit, and delete, a company picker on contacts, and a company's linked people. The pipeline, deals, and activities come next. It colors and types like the web app, with light and dark themes that follow the system setting.
 
 ```sh
 cd native-client
@@ -462,8 +462,13 @@ The app calls the API at `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by defau
 | `native-client/src/session.ts` | The signed-in user, restore, sign-in, registration, and sign-out |
 | `native-client/src/workspaces.ts` | The user's workspaces and the open one |
 | `native-client/src/services.ts` | The one session and workspace service, wired to the device |
+| `native-client/src/api/records.ts` | Contacts and companies routes of one workspace |
+| `native-client/src/lib/records/` | Field checks and request bodies, list paging, the people of a company, and the hooks behind each screen |
+| `native-client/src/components/` | Shared components: lists, forms, the company picker, and dialogs |
 | `native-client/src/lib/` | Device storage, a small store, and form checks |
 
 The client is a TypeScript port of the web client with the same rules: one refresh at a time, one retry after a 401, a refused token ends the session, and a lost connection, a timeout, or a 429 keeps it. A refresh that takes longer than 15 seconds is given up. There is no cross-tab lock, because a device runs one instance of the app.
 
 The access token lives in memory only. The refresh token lives in the platform's secure storage (the Keychain on iOS and the Keystore on Android) under `crm.refresh_token`, is read once at start, and is then kept in memory because the client reads it synchronously. On the web export it uses `localStorage`, with the tradeoff described under [Session and tokens](#session-and-tokens). Starting the app trades the saved token for a new pair, and a failed restore that is not a refused token shows the error with a retry. The open workspace is saved per user under `crm.workspace.<user id>`.
+
+The tabs (Home, Contacts, Companies) hold the lists. A record's detail, create, and edit screens sit above the tabs in the app's stack, so Back returns to wherever the person came from, such as a company's page after adding a person to it. Lists and open records load again when any screen creates, edits, or deletes a record. Switching workspace leaves a record's screen for its list. Deleting asks first, in a dialog of the app's own, because `Alert.alert` does nothing on the web export.

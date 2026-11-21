@@ -6,12 +6,12 @@ type Props = {
   onPress: () => void;
   busy?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'danger';
 };
 
 export function Button({ label, onPress, busy = false, disabled = false, variant = 'primary' }: Props) {
   const theme = useTheme();
-  const primary = variant === 'primary';
+  const primary = variant !== 'secondary';
   return (
     <Pressable
       accessibilityRole="button"
@@ -20,7 +20,7 @@ export function Button({ label, onPress, busy = false, disabled = false, variant
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: primary ? theme.accentStrong : theme.surface2, opacity: disabled || busy ? 0.6 : pressed ? 0.85 : 1 }
+        { backgroundColor: variant === 'danger' ? theme.dangerStrong : primary ? theme.accentStrong : theme.surface2, opacity: disabled || busy ? 0.6 : pressed ? 0.85 : 1 }
       ]}
     >
       {busy ? <ActivityIndicator color={primary ? '#fff' : theme.text} /> : null}

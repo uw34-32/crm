@@ -1,10 +1,10 @@
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '../../components/Button';
-import { WorkspaceSwitcher } from '../../components/WorkspaceSwitcher';
-import { useStore } from '../../lib/store';
-import { session, workspaces } from '../../services';
-import { useTheme } from '../../theme';
+import { Button } from '../../../components/Button';
+import { WorkspaceSwitcher } from '../../../components/WorkspaceSwitcher';
+import { useStore } from '../../../lib/store';
+import { session, workspaces } from '../../../services';
+import { useTheme } from '../../../theme';
 
 export default function Home() {
   const theme = useTheme();
@@ -16,7 +16,7 @@ export default function Home() {
         <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
           {current?.name ?? 'Workspace'}
         </Text>
-        <Text style={{ color: theme.text2 }}>Signed in as {user?.name} ({user?.email}). Contacts, deals, and activities arrive next.</Text>
+        <Text style={{ color: theme.text2 }}>Signed in as {user?.name} ({user?.email}). Contacts and companies are in the tabs below; deals and activities arrive next.</Text>
         <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>
           Workspaces
         </Text>

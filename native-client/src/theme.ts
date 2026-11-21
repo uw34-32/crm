@@ -13,7 +13,8 @@ const light = {
   accentText: '#005bb8',
   accentStrong: '#0066cc',
   danger: '#ff453a',
-  dangerText: '#b3261e'
+  dangerText: '#b3261e',
+  dangerStrong: '#b3261e'
 };
 
 const dark: typeof light = {
