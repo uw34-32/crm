@@ -1,0 +1,3 @@
+allowBuilds:
+  # Metro falls back to its node file watcher, so the optional native watcher build is not needed.
+  "@parcel/watcher": false

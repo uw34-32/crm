@@ -21,6 +21,7 @@ Go, Chi v5, pgx v5, golang-jwt v5, bcrypt, and PostgreSQL 16 through Docker Comp
 | `backend/pkg/testdb` | Connections for database-backed tests |
 | `scripts/` | Local development helpers |
 | `web/` | The SvelteKit web app; see [Web app](#web-app) |
+| `native-client/` | The Expo and React Native app; see [Native app](#native-app) |
 
 ## Run
 
@@ -439,3 +440,30 @@ Migration tests, and the store tests that sabotage the schema, run in throwaway 
 ## Migrations
 
 Add `backend/pkg/migrate/migrations/NNN_name.sql`. Pending files run in version order inside one transaction, so a failure rolls back the whole run, and statements that refuse to run in a transaction, such as `CREATE INDEX CONCURRENTLY`, are not supported. `001_init.sql` is an empty baseline; the runner itself creates `schema_migrations`.
+
+## Native app
+
+`native-client/` is an Expo (SDK 58) app with Expo Router, built with pnpm. So far it has the shell and auth: sign-in, registration, a workspace switcher, creating a workspace, and sign-out. Contacts, companies, the pipeline, deals, and activities come next. It colors and types like the web app, with light and dark themes that follow the system setting.
+
+```sh
+cd native-client
+pnpm install
+pnpm start          # Expo dev server; press a, i, or w for Android, iOS, or web
+pnpm typecheck
+pnpm test
+```
+
+The app calls the API at `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by default. An Android emulator reaches the host at `http://10.0.2.2:8085`, and a phone needs the computer's address on the network. Expo web runs on port 8081, which `dev.sh` already allows in `CORS_ORIGINS`; native requests send no `Origin` header.
+
+| Path | Purpose |
+| --- | --- |
+| `native-client/src/app/` | Expo Router screens: `(auth)` for signed-out, `(app)` for signed-in |
+| `native-client/src/api/` | The API client, token store, and logout, with their tests in `__tests__/` |
+| `native-client/src/session.ts` | The signed-in user, restore, sign-in, registration, and sign-out |
+| `native-client/src/workspaces.ts` | The user's workspaces and the open one |
+| `native-client/src/services.ts` | The one session and workspace service, wired to the device |
+| `native-client/src/lib/` | Device storage, a small store, and form checks |
+
+The client is a TypeScript port of the web client with the same rules: one refresh at a time, one retry after a 401, a refused token ends the session, and a lost connection, a timeout, or a 429 keeps it. A refresh that takes longer than 15 seconds is given up. There is no cross-tab lock, because a device runs one instance of the app.
+
+The access token lives in memory only. The refresh token lives in the platform's secure storage (the Keychain on iOS and the Keystore on Android) under `crm.refresh_token`, is read once at start, and is then kept in memory because the client reads it synchronously. On the web export it uses `localStorage`, with the tradeoff described under [Session and tokens](#session-and-tokens). Starting the app trades the saved token for a new pair, and a failed restore that is not a refused token shows the error with a retry. The open workspace is saved per user under `crm.workspace.<user id>`.
