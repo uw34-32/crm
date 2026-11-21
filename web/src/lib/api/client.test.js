@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, createClient } from './client.js';
+import { ApiError, createClient, REFRESH_TIMEOUT_MS } from './client.js';
 import { createTokenStore, REFRESH_TOKEN_KEY } from './tokens.js';
 
 const BASE = 'http://api.test';
@@ -449,5 +449,67 @@ describe('refresh across tabs', () => {
 
     expect(api.fetch).toHaveBeenCalledTimes(1);
     expect(only.tokens.getAccess()).toBe('access-2');
+  });
+
+  it('gives up a hung refresh, frees the lock for the next tab, and keeps the token', async () => {
+    vi.useFakeTimers();
+    try {
+      const storage = sharedStorage();
+      storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+      const locks = sharedLocks();
+      let calls = 0;
+      const fetch = vi.fn((/** @type {RequestInfo | URL} */ _url, /** @type {RequestInit} */ init = {}) => {
+        calls++;
+        if (calls > 1) return Promise.resolve(reply(200, { data: { token: 'access-2', refresh_token: 'refresh-2' } }));
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      });
+      const make = () => {
+        const tokens = createTokenStore(storage);
+        const onSessionEnd = vi.fn();
+        return { tokens, onSessionEnd, client: createClient({ baseUrl: BASE, fetch, tokens, onSessionEnd, locks: /** @type {any} */ (locks) }) };
+      };
+      const hung = make();
+      const next = make();
+
+      const first = hung.client.refresh().catch((e) => e);
+      const second = next.client.refresh();
+      await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS);
+
+      expect(await first).toMatchObject({ status: 0 });
+      await second;
+      expect(hung.onSessionEnd).not.toHaveBeenCalled();
+      expect(next.tokens.getAccess()).toBe('access-2');
+      expect(storage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-2');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rotates without the lock when the browser refuses the lock request', async () => {
+    const storage = sharedStorage();
+    storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const api = rotatingServer();
+    const refusing = { request: () => Promise.reject(new DOMException('denied', 'SecurityError')) };
+    const only = tab(storage, api, refusing);
+
+    await only.client.refresh();
+
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+    expect(only.tokens.getAccess()).toBe('access-2');
+    expect(only.onSessionEnd).not.toHaveBeenCalled();
+  });
+
+  it('does not rotate twice when the refresh itself fails inside the lock', async () => {
+    const storage = sharedStorage();
+    storage.setItem(REFRESH_TOKEN_KEY, 'refresh-1');
+    const api = { fetch: vi.fn(async () => reply(429, { error: 'slow down' })), server: {} };
+    const only = tab(storage, /** @type {any} */ (api), sharedLocks());
+
+    await expect(only.client.refresh()).rejects.toMatchObject({ status: 429 });
+
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+    expect(storage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-1');
   });
 });

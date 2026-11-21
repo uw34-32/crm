@@ -22,6 +22,9 @@ const MSG_SERVER = 'Something went wrong on the server. Try again in a moment.';
 const MSG_BUSY = 'The server is busy. Try again in a moment.';
 const MSG_SESSION_ENDED = 'Your session has ended. Sign in again.';
 
+/** How long a refresh may take before it is given up, so a hung request cannot hold the lock every tab shares. */
+export const REFRESH_TIMEOUT_MS = 15000;
+
 /** A failed request. status is 0 when the server could not be reached. */
 export class ApiError extends Error {
   /** @param {number} status @param {string} message @param {number | null} [retryAfter] */
@@ -121,19 +124,42 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd, locks = def
    * before it stored. The access token stays in each tab's memory, so every tab still
    * makes its own call.
    */
-  function rotate() {
-    return locks ? locks.request(REFRESH_LOCK, rotateNow) : rotateNow();
+  async function rotate() {
+    if (!locks) return rotateNow();
+    let entered = false;
+    try {
+      return await locks.request(REFRESH_LOCK, () => {
+        entered = true;
+        return rotateNow();
+      });
+    } catch (err) {
+      // A refused lock request says nothing about the token: rotate without the lock
+      // rather than fail a session that is still good.
+      if (entered) throw err;
+      return rotateNow();
+    }
   }
 
   async function rotateNow() {
     const refreshToken = tokens.getRefresh();
     if (!refreshToken) throw endSession();
-    const res = await send('/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } }, '');
-    if (res.status === 401 || res.status === 400) throw endSession();
-    if (!res.ok) throw await errorOf(res);
-    const raw = await res.json().catch(() => null);
-    if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, MSG_SERVER);
-    tokens.save(raw.data);
+    // The timer covers the whole exchange, body included. A timed-out refresh keeps the
+    // token, like any other failure that says nothing about it.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), REFRESH_TIMEOUT_MS);
+    try {
+      const res = await send('/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken }, signal: abort.signal }, '');
+      if (res.status === 401 || res.status === 400) throw endSession();
+      if (!res.ok) throw await errorOf(res);
+      const raw = await res.json().catch(() => null);
+      if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, MSG_SERVER);
+      tokens.save(raw.data);
+    } catch (err) {
+      if (abort.signal.aborted && isAbort(err)) throw new ApiError(0, MSG_NETWORK);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Every caller waiting at once shares one rotation, so the token rotates once. */
