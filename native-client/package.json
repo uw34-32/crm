@@ -18,6 +18,7 @@
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.6",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
     "@types/react": "~19.3.0",
@@ -32,7 +33,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "export:web": "expo export --platform web",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "private": true,
   "jest": {

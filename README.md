@@ -474,3 +474,19 @@ The client is a TypeScript port of the web client with the same rules: one refre
 The access token lives in memory only. The refresh token lives in the platform's secure storage (the Keychain on iOS and the Keystore on Android) under `crm.refresh_token`, is read once at start, and is then kept in memory because the client reads it synchronously. On the web export it uses `localStorage`, with the tradeoff described under [Session and tokens](#session-and-tokens). Starting the app trades the saved token for a new pair, and a failed restore that is not a refused token shows the error with a retry. The open workspace is saved per user under `crm.workspace.<user id>`.
 
 The tabs (Home, Contacts, Companies) hold the lists. A record's detail, create, and edit screens sit above the tabs in the app's stack, so Back returns to wherever the person came from, such as a company's page after adding a person to it. Lists and open records load again when any screen creates, edits, or deletes a record. Switching workspace leaves a record's screen for its list. Deleting asks first, in a dialog of the app's own, because `Alert.alert` does nothing on the web export.
+
+## Desktop app
+
+`native-client/src-tauri/` wraps the Expo web export in a Tauri 2 window, the way `contacts` does. It has no Rust code of its own beyond opening the window: the app calls the API from the page, so the CRM's sign-in, workspaces, contacts, companies, pipeline, deals, and activities all work as on the web export.
+
+```sh
+cd native-client
+pnpm install
+pnpm desktop            # tauri dev: starts the Expo web server on 8081 and opens the window
+pnpm desktop:build      # tauri build: exports the web app, compiles, and bundles
+npx tauri build --no-bundle   # just the binary: src-tauri/target/release/crm-desktop
+```
+
+It needs Rust and, on Linux, the WebKitGTK 4.1 and GTK 3 development packages. The window's origin is `tauri://localhost` on Linux and macOS and `http://tauri.localhost` on Windows; `dev.sh` already allows both in `CORS_ORIGINS`. The API address is baked in at export time from `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by default, so a build for another API sets it first.
+
+The Content-Security-Policy allows requests to any `http:` or `https:` address, because the API's address is configuration, not a constant. Tauri adds a nonce to `style-src` and a browser then ignores `'unsafe-inline'`, which blocks the styles React Native Web injects at run time, so `dangerousDisableAssetCspModification` leaves `style-src` alone. Scripts keep Tauri's protection. The refresh token lives in `localStorage` inside the window's own data directory, with the tradeoff described under [Session and tokens](#session-and-tokens).

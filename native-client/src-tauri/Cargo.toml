@@ -1,0 +1,15 @@
+[package]
+name = "crm-desktop"
+version = "0.1.0"
+description = "The CRM desktop app: the Expo web export in a Tauri window"
+edition = "2021"
+
+[lib]
+name = "crm_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
