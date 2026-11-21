@@ -64,7 +64,7 @@ export default function EditContact() {
             email: contact.email ?? '',
             phone: contact.phone ?? '',
             title: contact.title ?? '',
-            company: contact.company_id ? { id: contact.company_id, name: contact.company_name ?? '' } : null
+            company: contact.company_id ? { id: contact.company_id, name: contact.company_name || 'Linked company' } : null
           }}
           submitLabel="Save changes"
           busy={busy}

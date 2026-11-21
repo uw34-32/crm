@@ -24,7 +24,9 @@ export default function ContactDetail() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/contacts');
-  const { state, workspaceId, reload } = useRecord(contacts.get, id);
+  const [gone, setGone] = useState(false);
+  // Once deleted, the record is not loaded again: it would answer 404 while the screen closes.
+  const { state, workspaceId, reload } = useRecord(contacts.get, id, { paused: gone });
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -48,10 +50,11 @@ export default function ContactDetail() {
         return;
       }
     }
+    setGone(true);
     setConfirming(false);
     setDeleting(false);
-    recordsChanged();
     router.dismissTo('/contacts');
+    recordsChanged();
   }
 
   return (

@@ -24,13 +24,16 @@ export function CompanyPicker({ workspaceId, value, onChange, error = '' }: Prop
   const [options, setOptions] = useState<Company[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const generation = useRef(0);
+  // The debounced search outlives renders, so it reads the workspace from here.
+  const workspace = useRef(workspaceId);
+  workspace.current = workspaceId;
 
   const search = useRef(
     debounce(async (text: string) => {
       const mine = ++generation.current;
       setStatus('loading');
       try {
-        const page = await companies.list(workspaceId, { q: text.trim(), limit: RESULTS, offset: 0 });
+        const page = await companies.list(workspace.current, { q: text.trim(), limit: RESULTS, offset: 0 });
         if (mine !== generation.current) return;
         setOptions(page.items);
         setStatus('ready');

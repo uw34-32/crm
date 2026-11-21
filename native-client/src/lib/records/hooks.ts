@@ -39,8 +39,12 @@ export function useRecordList<T>(fetchPage: (workspaceId: string, params: Parame
     return () => clearTimeout(timer);
   }, [search]);
 
+  // A new search or workspace starts over; a change to some record refreshes behind the rows.
+  const loadedVersion = useRef(version);
   useEffect(() => {
-    if (workspaceId) void pager.load(q);
+    const quiet = loadedVersion.current !== version;
+    loadedVersion.current = version;
+    if (workspaceId) void pager.load(q, { quiet });
   }, [workspaceId, q, version, pager]);
 
   useEffect(() => () => pager.stop(), [pager]);
@@ -57,19 +61,23 @@ export function useRecordList<T>(fetchPage: (workspaceId: string, params: Parame
 type RecordState<T> = Loaded<T> | { status: 'loading'; record: null; error: '' };
 
 /** One record of the open workspace, loaded again when its ID or any record changes. */
-export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Promise<T>, id: string) {
+export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Promise<T>, id: string, { paused = false }: { paused?: boolean } = {}) {
   const workspaceId = useWorkspaceId();
   const { version } = useStore(changes);
   const latest = useRef(fetchOne);
   latest.current = fetchOne;
   const [state, setState] = useState<RecordState<T>>({ status: 'loading', record: null, error: '' });
   const generation = useRef(0);
+  const shown = useRef('');
 
   async function load() {
-    if (!workspaceId) return;
+    if (!workspaceId || paused) return;
     const mine = ++generation.current;
-    // Keep what is on screen while it loads again after an edit.
-    setState((now) => (now.status === 'ready' ? now : { status: 'loading', record: null, error: '' }));
+    // Keep what is on screen while it loads again after an edit, but never another record's.
+    const key = `${workspaceId}/${id}`;
+    const same = shown.current === key;
+    shown.current = key;
+    setState((now) => (same && now.status === 'ready' ? now : { status: 'loading', record: null, error: '' }));
     const got = await loadRecord(() => latest.current(workspaceId, id));
     if (mine === generation.current) setState(got);
   }
@@ -80,7 +88,7 @@ export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Prom
       generation.current++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, id, version]);
+  }, [workspaceId, id, version, paused]);
 
   return { state, workspaceId, reload: load };
 }
@@ -91,9 +99,12 @@ export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Prom
  */
 export function useLeaveOnWorkspaceSwitch(listHref: '/contacts' | '/companies') {
   const workspaceId = useWorkspaceId();
+  // The workspace this screen first saw, which may arrive after it mounts.
   const first = useRef(workspaceId);
   useEffect(() => {
-    if (workspaceId && first.current && workspaceId !== first.current) router.dismissTo(listHref);
+    if (!workspaceId) return;
+    if (!first.current) first.current = workspaceId;
+    else if (workspaceId !== first.current) router.dismissTo(listHref);
   }, [workspaceId, listHref]);
   return workspaceId;
 }

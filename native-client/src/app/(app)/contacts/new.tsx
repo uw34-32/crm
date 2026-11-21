@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { recordsApi, type Company } from '../../../api/records';
+import { Button } from '../../../components/Button';
+import { ErrorNotice } from '../../../components/ErrorNotice';
 import { ContactForm } from '../../../components/ContactForm';
 import { ScreenFrame } from '../../../components/ScreenFrame';
 import type { Choice } from '../../../components/CompanyPicker';
@@ -21,20 +23,30 @@ export default function NewContact() {
   // Arriving from a company's screen links the new contact to it.
   const { company: companyId } = useLocalSearchParams<{ company?: string }>();
   const [preset, setPreset] = useState<Choice | null | undefined>(companyId ? undefined : null);
+  const [presetError, setPresetError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!companyId || !workspaceId) return;
     let live = true;
+    setPresetError('');
     companies
       .get(workspaceId, companyId)
       .then((company: Company) => live && setPreset({ id: company.id, name: company.name }))
-      .catch(() => live && setPreset(null));
+      .catch((err: unknown) => {
+        if (!live) return;
+        // A company that is gone is not an error to retry: the contact can still be added.
+        if (isMissing(err)) {
+          setPreset(null);
+          setPresetError('That company no longer exists, so the new contact will not be linked to it.');
+        } else setPresetError(err instanceof Error ? err.message : String(err));
+      });
     return () => {
       live = false;
     };
-  }, [companyId, workspaceId]);
+  }, [companyId, workspaceId, attempt]);
 
   async function create(draft: ContactDraft) {
     if (!workspaceId) return;
@@ -56,10 +68,18 @@ export default function NewContact() {
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
         New contact
       </Text>
-      {preset === undefined || !workspaceId ? (
+      {preset === undefined && presetError ? (
+        <>
+          <ErrorNotice message={`The company could not be loaded. ${presetError}`} onRetry={() => setAttempt((n) => n + 1)} />
+          <Button label="Add without the company" variant="secondary" onPress={() => setPreset(null)} />
+        </>
+      ) : preset === undefined || !workspaceId ? (
         <ActivityIndicator accessibilityLabel="Loading the company" />
       ) : (
-        <ContactForm workspaceId={workspaceId} initial={{ company: preset }} submitLabel="Add contact" busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
+        <>
+          {presetError ? <ErrorNotice message={presetError} /> : null}
+          <ContactForm workspaceId={workspaceId} initial={{ company: preset }} submitLabel="Add contact" busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
+        </>
       )}
     </ScreenFrame>
   );

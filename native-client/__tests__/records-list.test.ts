@@ -79,3 +79,30 @@ describe('pager', () => {
     expect(store.get().status).toBe('loading');
   });
 });
+
+describe('quiet refresh', () => {
+  it('keeps the rows on screen, asks for as many as were loaded, and swaps them in', async () => {
+    const fetchPage = jest
+      .fn()
+      .mockResolvedValueOnce(page([1, 2], true))
+      .mockResolvedValueOnce(page([3, 4], false))
+      .mockResolvedValueOnce(page([10, 20, 30, 40], false));
+    const { store, pager } = setup(fetchPage, { limit: 2 });
+    await pager.load('');
+    await pager.more();
+    const seen: string[] = [];
+    store.subscribe(() => seen.push(store.get().status));
+    await pager.load('', { quiet: true });
+    expect(fetchPage).toHaveBeenLastCalledWith({ q: '', limit: 4, offset: 0 });
+    expect(store.get().items).toEqual([10, 20, 30, 40]);
+    expect(seen.every((status) => status === 'ready')).toBe(true);
+  });
+
+  it('keeps everything when the refresh fails', async () => {
+    const fetchPage = jest.fn().mockResolvedValueOnce(page([1, 2], true)).mockRejectedValueOnce(new Error('down'));
+    const { store, pager } = setup(fetchPage);
+    await pager.load('');
+    await pager.load('', { quiet: true });
+    expect(store.get()).toMatchObject({ status: 'ready', items: [1, 2], error: '' });
+  });
+});

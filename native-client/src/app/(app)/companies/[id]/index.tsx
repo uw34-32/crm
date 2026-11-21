@@ -12,7 +12,7 @@ import { ScreenFrame } from '../../../../components/ScreenFrame';
 import { TextAction } from '../../../../components/TextAction';
 import { toSentence } from '../../../../lib/forms';
 import { useStore } from '../../../../lib/store';
-import { recordsChanged } from '../../../../lib/records/changes';
+import { changes, recordsChanged } from '../../../../lib/records/changes';
 import { contactName, contactSubtitle } from '../../../../lib/records/format';
 import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/hooks';
 import { createListStore, createPager } from '../../../../lib/records/list';
@@ -29,7 +29,10 @@ export default function CompanyDetail() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/companies');
-  const { state, workspaceId, reload } = useRecord(companies.get, id);
+  const [gone, setGone] = useState(false);
+  // Once deleted, the record is not loaded again: it would answer 404 while the screen closes.
+  const { state, workspaceId, reload } = useRecord(companies.get, id, { paused: gone });
+  const { version } = useStore(changes);
   const company = state.record;
 
   const [{ store, pager }] = useState(() => {
@@ -40,7 +43,7 @@ export default function CompanyDetail() {
 
   // The pager filters on this company's ID, so it is built once the company is known.
   useEffect(() => {
-    if (!company || !workspaceId) return;
+    if (!company || !workspaceId || gone) return;
     const mine = createPager(store, (params) => contactsApi.list(workspaceId, params), { keep: isPersonOf(company.id) });
     pager.current = mine;
     let current = true;
@@ -49,7 +52,7 @@ export default function CompanyDetail() {
       current = false;
       mine.stop();
     };
-  }, [company?.id, company?.name, workspaceId, store, pager]);
+  }, [company?.id, company?.name, workspaceId, store, pager, version, gone]);
 
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -70,10 +73,11 @@ export default function CompanyDetail() {
         return;
       }
     }
+    setGone(true);
     setConfirming(false);
     setDeleting(false);
-    recordsChanged();
     router.dismissTo('/companies');
+    recordsChanged();
   }
 
   const details = company ? ([['Domain', company.domain], ['Phone', company.phone], ['Industry', company.industry], ['Address', company.address]] as const).filter(([, value]) => value) : [];
@@ -131,7 +135,7 @@ export default function CompanyDetail() {
             ) : people.status !== 'ready' ? (
               <ActivityIndicator accessibilityLabel="Loading people" />
             ) : people.items.length === 0 ? (
-              <Text style={{ color: theme.text2 }}>{people.hasMore ? 'None found yet.' : 'No one is linked to this company yet.'}</Text>
+              <Text style={{ color: theme.text2 }}>{people.hasMore ? 'None found in the first results. Look further to check more.' : 'No one is linked to this company yet.'}</Text>
             ) : (
               people.items.map((person) => (
                 <Pressable

@@ -6,6 +6,8 @@ import type { Store } from '../store';
 import { createStore } from '../store';
 
 export const PAGE_SIZE = 50;
+/** The API's largest page. */
+const MAX_PAGE = 200;
 
 export type ListState<T> = {
   items: T[];
@@ -39,18 +41,25 @@ export function createPager<T>(store: Store<ListState<T>>, fetchPage: FetchPage<
 
   const kept = (items: T[]) => (keep ? items.filter(keep) : items);
 
-  /** Loads the first page of a search, replacing what is shown. */
-  async function load(search: string) {
+  /**
+   * Loads the first page of a search, replacing what is shown. A quiet load is for
+   * a refresh behind the rows already on screen: it keeps them, asks for as many as
+   * were loaded so far, and swaps them in when the answer arrives.
+   */
+  async function load(search: string, { quiet = false }: { quiet?: boolean } = {}) {
     const q = search.trim();
     const mine = ++generation;
-    store.set({ q, status: 'loading', error: '', moreError: '', loadingMore: false });
+    const size = quiet ? Math.min(MAX_PAGE, Math.max(limit, offset)) : limit;
+    if (!quiet) store.set({ q, status: 'loading', error: '', moreError: '', loadingMore: false });
     try {
-      const page = await fetchPage({ q, limit, offset: 0 });
+      const page = await fetchPage({ q, limit: size, offset: 0 });
       if (mine !== generation) return;
       offset = page.items.length;
-      store.set({ items: kept(page.items), hasMore: page.has_more, status: 'ready' });
+      store.set({ q, items: kept(page.items), hasMore: page.has_more, status: 'ready', error: '', moreError: '', loadingMore: false });
     } catch (err) {
       if (mine !== generation) return;
+      // Behind the rows on screen, a failed refresh changes nothing; the next one tries again.
+      if (quiet) return;
       store.set({ items: [], hasMore: false, error: messageOf(err), status: 'error' });
     }
   }
