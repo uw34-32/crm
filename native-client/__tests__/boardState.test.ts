@@ -145,3 +145,87 @@ describe('quiet reload', () => {
     expect(board.store.get().columns[0].deals).toHaveLength(2);
   });
 });
+
+describe('a refresh that meets a move', () => {
+  it('leaves the move alone, waits for it, and then refreshes', async () => {
+    let finish: (d: Deal) => void = () => {};
+    const { board, pipelines, move } = setup({ move: jest.fn(() => new Promise<Deal>((resolve) => (finish = resolve))) });
+    await board.load('w1');
+    const moving = board.move('a', 's2', null);
+    const listsBefore = pipelines.list.mock.calls.length;
+    await board.load('w1', 'p1', { quiet: true });
+    // Nothing was asked of the API while the move was in flight.
+    expect(pipelines.list).toHaveBeenCalledTimes(listsBefore);
+    expect(board.store.get().busy).toEqual({ a: true });
+    expect(board.store.get().columns[1].deals.map((d) => d.id)).toEqual(['c', 'a']);
+    finish(deal('a', 's2', 1));
+    await moving;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pipelines.list).toHaveBeenCalledTimes(listsBefore + 1);
+    expect(move).toHaveBeenCalledTimes(1);
+    expect(board.store.get().busy).toEqual({});
+  });
+
+  it('does not apply deals that were read before a move began', async () => {
+    // The server's truth: it has the move once the move request has been made.
+    let moved = false;
+    const before = () => [deal('a', 's1', 0), deal('b', 's1', 1), deal('c', 's2', 0)];
+    const after = () => [deal('a', 's2', 1), deal('b', 's1', 0), deal('c', 's2', 0)];
+    let release: () => void = () => {};
+    let hold = false;
+    const list = jest.fn(async (_w: string, q: { status?: string }) => {
+      if (q.status !== 'open') return page([]);
+      // The refresh reads the deals as they are now, but its answer is slow.
+      const read = moved ? after() : before();
+      if (hold) await new Promise<void>((resolve) => (release = resolve));
+      return page(read);
+    });
+    const move = jest.fn(async (_w: string, id: string, body: { stage_id: string }) => {
+      moved = true;
+      return deal(id, body.stage_id, 1);
+    });
+    const { board } = setup({ list, move });
+    await board.load('w1');
+
+    hold = true;
+    const refreshing = board.load('w1', 'p1', { quiet: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    hold = false;
+    const moving = board.move('a', 's2', null);
+    release();
+    await refreshing;
+    // The older board did not undo the move.
+    expect(board.store.get().columns[0].deals.map((d) => d.id)).toEqual(['b']);
+    await moving;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(board.store.get().columns[0].deals.map((d) => d.id)).toEqual(['b']);
+    expect(board.store.get().columns[1].deals.map((d) => d.id)).toEqual(['c', 'a']);
+  });
+
+  it('can still move the deal after the refresh that waited for it fails', async () => {
+    const { board, pipelines, move } = setup();
+    await board.load('w1');
+    const moving = board.move('a', 's2', null);
+    await board.load('w1', 'p1', { quiet: true });
+    pipelines.list.mockRejectedValue(new Error('down'));
+    await moving;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await board.move('b', 's2', null);
+    expect(move).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('paging after moves in and out of a closed stage', () => {
+  it('moves the next page start with the deal', async () => {
+    const { board, list } = setup();
+    await board.load('w1');
+    expect(board.store.get().closed.won.offset).toBe(1);
+    await board.move('a', 'won', null);
+    expect(board.store.get().closed.won.offset).toBe(2);
+    await board.move('w', 's1', null);
+    expect(board.store.get().closed.won.offset).toBe(1);
+    list.mockResolvedValueOnce(page([], false));
+    await board.loadMore('won');
+    expect(list).toHaveBeenLastCalledWith('w1', { pipeline_id: 'p1', status: 'won', limit: 50, offset: 1 });
+  });
+});

@@ -44,6 +44,7 @@ const pipelines = pipelinesApi(session.api);
 export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], creating = false, submitLabel, busy, error, onSubmit, onCancel }: Props) {
   const [title, setTitle] = useState(initial.title ?? '');
   const [currency, setCurrency] = useState(initial.currency ?? 'USD');
+  const [valueTouched, setValueTouched] = useState(false);
   const [value, setValue] = useState(initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '');
   const [pipelineId, setPipelineId] = useState(initial.pipeline_id ?? choices[0]?.id ?? '');
   const [stageId, setStageId] = useState('');
@@ -80,6 +81,12 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
     };
   }, [creating, pipelineId, workspaceId]);
 
+  // The stored amount is in minor units, so an untouched value follows the currency's decimals.
+  function changeCurrency(text: string) {
+    setCurrency(text);
+    if (!valueTouched && initial.value_minor) setValue(majorText(initial.value_minor, text.trim().toUpperCase()));
+  }
+
   function submit() {
     const draft: DealDraft = {
       title,
@@ -101,8 +108,8 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
     <View style={{ gap: 16 }}>
       {error ? <ErrorNotice message={toSentence(error)} /> : null}
       <Field label="Title" value={title} onChangeText={setTitle} error={errors.title} returnKeyType="next" onSubmitEditing={() => valueInput.current?.focus()} />
-      <Field ref={valueInput} label="Value" value={value} onChangeText={setValue} error={errors.value} keyboardType="decimal-pad" placeholder="1250.50" returnKeyType="next" onSubmitEditing={() => currencyInput.current?.focus()} />
-      <Field ref={currencyInput} label="Currency" value={currency} onChangeText={setCurrency} error={errors.currency} autoCapitalize="characters" autoCorrect={false} maxLength={3} returnKeyType="next" onSubmitEditing={() => dateInput.current?.focus()} />
+      <Field ref={valueInput} label="Value" value={value} onChangeText={(text) => { setValueTouched(true); setValue(text); }} error={errors.value} keyboardType="decimal-pad" placeholder="1250.50" returnKeyType="next" onSubmitEditing={() => currencyInput.current?.focus()} />
+      <Field ref={currencyInput} label="Currency" value={currency} onChangeText={changeCurrency} error={errors.currency} autoCapitalize="characters" autoCorrect={false} maxLength={3} returnKeyType="next" onSubmitEditing={() => dateInput.current?.focus()} />
       {creating && choices.length > 1 ? (
         <OptionChips label="Pipeline" value={pipelineId} options={choices.map((p) => ({ value: p.id, label: p.name }))} onChange={setPipelineId} />
       ) : null}

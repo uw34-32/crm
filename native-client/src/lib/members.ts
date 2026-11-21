@@ -27,6 +27,6 @@ export function useMembers(workspaceId: string | null) {
   useEffect(() => {
     if (workspaceId && store.get().workspaceId !== workspaceId) void loadMembers(workspaceId);
   }, [workspaceId]);
-  const mine = state.workspaceId === workspaceId;
+  const mine = workspaceId !== null && state.workspaceId === workspaceId;
   return { members: mine ? state.list : [], status: mine ? state.status : 'loading', retry: () => workspaceId && loadMembers(workspaceId) };
 }

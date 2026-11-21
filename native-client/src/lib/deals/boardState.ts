@@ -51,7 +51,14 @@ export function createBoard({ pipelines, deals }: Deps) {
     notice: ''
   });
   let workspaceId = '';
+  /** Moves and page loads belong to one generation; a full load or stop ends it. */
   let generation = 0;
+  /** Refreshes, quiet or not, supersede one another through this. */
+  let loadSeq = 0;
+  /** Counts the moves begun, so a refresh can tell whether one began while it was loading. */
+  let moveEpoch = 0;
+  /** A quiet refresh that waited for moves to settle. */
+  let pending: { workspaceId: string; wanted: string } | null = null;
 
   async function loadOpen(pipelineId: string) {
     const items: Deal[] = [];
@@ -74,24 +81,51 @@ export function createBoard({ pipelines, deals }: Deps) {
     return flags;
   }
 
+  const moving = () => Object.keys(store.get().busy).length > 0;
+
+  /** Runs the refresh that waited for the last move to settle. */
+  function runPending() {
+    if (!pending || moving()) return;
+    const { workspaceId: forWorkspace, wanted } = pending;
+    pending = null;
+    void load(forWorkspace, wanted, { quiet: true });
+  }
+
   /**
    * Loads the pipelines and opens the one asked for, or the first. A quiet load is a
-   * refresh behind the board on screen: it keeps the columns, and a failure changes nothing.
+   * refresh behind the board on screen: it keeps the columns, a failure changes
+   * nothing, it leaves moves in flight alone, and it waits for them rather than show a
+   * board older than the move.
    */
   async function load(forWorkspace: string, wanted = '', { quiet = false }: { quiet?: boolean } = {}) {
     workspaceId = forWorkspace;
-    const mine = ++generation;
+    if (quiet && moving()) {
+      pending = { workspaceId: forWorkspace, wanted };
+      return;
+    }
+    // A full load starts over, so it ends the moves and page loads of the board it replaces.
+    const mine = quiet ? generation : ++generation;
+    const seq = ++loadSeq;
+    const epoch = moveEpoch;
+    const stale = () => mine !== generation || seq !== loadSeq;
     if (!quiet) store.set({ status: 'loading', error: '', notice: '' });
     try {
       const list = (await pipelines.list(workspaceId)).items;
-      if (mine !== generation) return;
+      if (stale()) return;
       const chosen = list.find((pipeline) => pipeline.id === wanted) ?? list[0];
       if (!chosen) {
         store.set({ pipelines: list, pipeline: null, columns: [], status: 'ready' });
         return;
       }
       const [pipeline, open, won, lost] = await Promise.all([pipelines.get(workspaceId, chosen.id), loadOpen(chosen.id), loadClosed(chosen.id, 'won', 0), loadClosed(chosen.id, 'lost', 0)]);
-      if (mine !== generation) return;
+      if (stale()) return;
+      // A move began while this was loading, even one that has finished: the deals read
+      // may predate it. Read again once the moves settle.
+      if (quiet && (moving() || moveEpoch !== epoch)) {
+        pending = { workspaceId, wanted };
+        if (!moving()) runPending();
+        return;
+      }
       const stages = pipeline.stages ?? [];
       store.set({
         pipelines: list,
@@ -106,7 +140,7 @@ export function createBoard({ pipelines, deals }: Deps) {
         status: 'ready'
       });
     } catch (err) {
-      if (mine !== generation || quiet) return;
+      if (stale() || quiet) return;
       store.set({ status: 'error', error: messageOf(err) });
     }
   }
@@ -121,13 +155,24 @@ export function createBoard({ pipelines, deals }: Deps) {
     if (state.busy[dealId]) return;
     const plan = planMove(state.columns, dealId, stageId, before);
     if (!plan) return;
+    moveEpoch++;
     const mine = generation;
+    const kindOf = (id: string) => state.columns.find((c) => c.stage.id === id)?.stage.kind;
     store.set({ columns: plan.columns, busy: { ...state.busy, [dealId]: true }, notice: '' });
     const body = lostReason ? { ...plan.body, lost_reason: lostReason } : plan.body;
     try {
       const moved = await deals.move(workspaceId, dealId, body);
       if (mine !== generation) return;
       store.set({ columns: replaceDeal(store.get().columns, moved) });
+      // A deal entering or leaving a closed stage changes what the next page starts after.
+      const from = kindOf(plan.from.stageId);
+      const to = kindOf(stageId);
+      if (from !== to) {
+        const closed = { ...store.get().closed };
+        if (from && from !== 'open') closed[from] = { ...closed[from], offset: Math.max(0, closed[from].offset - 1) };
+        if (to && to !== 'open') closed[to] = { ...closed[to], offset: closed[to].offset + 1 };
+        store.set({ closed });
+      }
     } catch (err) {
       if (mine !== generation) return;
       store.set({ columns: undoMove(store.get().columns, dealId, plan.from), notice: `The move was undone. ${toSentence(messageOf(err))}` });
@@ -137,6 +182,7 @@ export function createBoard({ pipelines, deals }: Deps) {
       if (mine === generation) {
         const { [dealId]: _done, ...rest } = store.get().busy;
         store.set({ busy: rest });
+        runPending();
       }
     }
   }

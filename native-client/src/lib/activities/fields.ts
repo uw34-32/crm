@@ -73,7 +73,8 @@ export function activityPatchBody(original: Record<string, any>, draft: Activity
   if (content !== text(original.body)) body.body = content;
   if (original.kind === 'task') {
     const due = fromLocalInput(text(draft.due_at));
-    const before = original.due_at ? new Date(original.due_at).toISOString() : null;
+    // The form shows a due time to the minute, so an untouched one is compared to the minute too.
+    const before = original.due_at ? fromLocalInput(toLocalInput(original.due_at)) : null;
     if (due !== before) body.due_at = due;
     const assignee = text(draft.assignee_id) || null;
     if (assignee !== (original.assignee_id ?? null)) body.assignee_id = assignee;

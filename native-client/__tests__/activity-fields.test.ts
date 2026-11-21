@@ -82,3 +82,17 @@ describe('the patch body', () => {
     expect(activityPatchBody(task, { kind: 'note', subject: 'Send proposal', body: 'PDF', due_at: '2027-03-14T09:30', assignee_id: 'u2' })).toEqual({});
   });
 });
+
+describe('patching a task whose due time has seconds', () => {
+  it('sends nothing for a due time the form shows to the minute and the person left alone', () => {
+    const original = { kind: 'task', subject: 'Call', body: '', due_at: '2027-03-14T10:00:30.000Z', assignee_id: null };
+    const shown = toLocalInput(original.due_at);
+    expect(activityPatchBody(original, { kind: 'task', subject: 'Call back', body: '', due_at: shown, assignee_id: null })).toEqual({ subject: 'Call back' });
+  });
+
+  it('sends the new time when the person changed it', () => {
+    const original = { kind: 'task', subject: 'Call', body: '', due_at: '2027-03-14T10:00:30.000Z', assignee_id: null };
+    const body = activityPatchBody(original, { kind: 'task', subject: 'Call', body: '', due_at: '2027-03-15T09:30', assignee_id: null });
+    expect(body.due_at).toBe(fromLocalInput('2027-03-15T09:30'));
+  });
+});
