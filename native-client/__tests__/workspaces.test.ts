@@ -72,3 +72,19 @@ describe('workspaces service', () => {
     expect(service.state.get().current?.id).toBe('b');
   });
 });
+
+describe('create after the user went away', () => {
+  it('leaves the reset state alone', async () => {
+    let finish: (w: Workspace) => void = () => {};
+    const request = jest.fn().mockResolvedValueOnce([ws('a')]).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    const storage = memoryStorage();
+    const service = createWorkspaces({ api: { request: request as never }, storage });
+    await service.load('u1');
+    const pending = service.create('Late');
+    service.reset();
+    finish(ws('late'));
+    await pending;
+    expect(service.state.get()).toMatchObject({ list: [], current: null, userId: null });
+    expect(storage.data.has('crm.workspace.u1') && storage.data.get('crm.workspace.u1') === 'late').toBe(false);
+  });
+});

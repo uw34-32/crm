@@ -1,5 +1,6 @@
 // The app's one session and workspace service, wired to the device.
 
+import { resetWorkspacesOnSignOut } from './bind';
 import { deviceStorage } from './lib/storage';
 import { createSession } from './session';
 import { createWorkspaces } from './workspaces';
@@ -14,3 +15,5 @@ export const session = createSession({
 });
 
 export const workspaces = createWorkspaces({ api: session.api, storage: deviceStorage });
+
+resetWorkspacesOnSignOut(session, workspaces);

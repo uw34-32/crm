@@ -113,3 +113,39 @@ describe('refresh', () => {
     }
   });
 });
+
+describe('refresh edge cases', () => {
+  it('drops the answer of a refresh that signing out overtook', async () => {
+    let answer: (r: Response) => void = () => {};
+    const fetch = jest.fn(() => new Promise<Response>((resolve) => (answer = resolve)));
+    const { client, tokens, onSessionEnd } = setup(fetch as unknown as jest.Mock);
+    const result = client.refresh().catch((e: unknown) => e);
+    tokens.clear();
+    answer(reply(200, { data: { token: 'access-2', refresh_token: 'refresh-2' } }));
+    expect(await result).toMatchObject({ status: 401 });
+    expect(tokens.getRefresh()).toBeNull();
+    expect(tokens.getAccess()).toBe('');
+    expect(onSessionEnd).not.toHaveBeenCalled();
+  });
+
+  it('reports a body that stalls past the timeout as a lost connection', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetch = jest.fn(async (_url: string, init: RequestInit) => {
+        const body = new ReadableStream({
+          start(controller) {
+            init.signal?.addEventListener('abort', () => controller.error(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+          }
+        });
+        return new Response(body, { status: 200 });
+      });
+      const { client, tokens } = setup(fetch as unknown as jest.Mock);
+      const result = client.refresh().catch((e: unknown) => e);
+      await jest.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS);
+      expect(await result).toMatchObject({ status: 0 });
+      expect(tokens.getRefresh()).toBe('refresh-1');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

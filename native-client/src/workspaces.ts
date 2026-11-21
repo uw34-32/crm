@@ -73,7 +73,11 @@ export function createWorkspaces({ api, storage }: { api: Pick<Client, 'request'
 
   /** Creates a workspace, with the caller as its owner, and opens it. */
   async function create(name: string) {
+    const userId = state.get().userId;
     const workspace = await api.request<Workspace>('/workspaces', { method: 'POST', body: { name } });
+    // The user may have signed out while this was in flight; the workspace exists on the
+    // server, and the next load of its owner will find it.
+    if (state.get().userId !== userId) return workspace;
     state.set({ list: [...state.get().list, workspace] });
     open(workspace);
     return workspace;

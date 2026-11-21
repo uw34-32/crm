@@ -107,7 +107,12 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd }: ClientOpt
       if (res.status === 401 || res.status === 400) throw endSession();
       if (!res.ok) throw await errorOf(res);
       const raw = (await res.json().catch(() => null)) as { data?: Session } | null;
+      // A body that stalls past the timeout reads as null, so say what went wrong.
+      if (abort.signal.aborted) throw new ApiError(0, MSG_NETWORK);
       if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, MSG_SERVER);
+      // Signing out, or signing in as someone else, while this was in flight replaced
+      // the token it started with; its answer belongs to a session that is gone.
+      if (tokens.getRefresh() !== refreshToken) throw new ApiError(401, MSG_SESSION_ENDED);
       tokens.save(raw.data);
     } catch (err) {
       if (abort.signal.aborted && isAbort(err)) throw new ApiError(0, MSG_NETWORK);

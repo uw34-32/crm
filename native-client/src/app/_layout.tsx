@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { Button } from '../components/Button';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { useStore } from '../lib/store';
 import { session } from '../services';
@@ -22,7 +23,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <View style={{ flex: 1, justifyContent: 'center', padding: 16, backgroundColor: theme.bg }}>
           {restoreError ? (
-            <ErrorNotice message={restoreError} onRetry={() => void session.restore()} />
+            <View style={{ gap: 12 }}>
+              <ErrorNotice message={restoreError} onRetry={() => void session.restore()} />
+              <Button label="Sign out" variant="secondary" onPress={() => void session.signOut()} />
+            </View>
           ) : (
             <ActivityIndicator accessibilityLabel="Restoring your session" />
           )}

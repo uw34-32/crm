@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { useStore } from '../../lib/store';
 import { session, workspaces } from '../../services';
@@ -10,14 +10,11 @@ export default function AppLayout() {
   const theme = useTheme();
   const { user } = useStore(session.state);
   const { status, error, list, userId } = useStore(workspaces.state);
+  const pathname = usePathname();
 
-  // Load the workspaces once per signed-in user; sign-out forgets them.
+  // Load the workspaces once per signed-in user. Sign-out forgets them in bind.ts.
   useEffect(() => {
-    if (!user) {
-      workspaces.reset();
-      return;
-    }
-    if (userId !== user.id) void workspaces.load(user.id);
+    if (user && userId !== user.id) void workspaces.load(user.id);
   }, [user, userId]);
 
   if (status === 'error') {
@@ -37,7 +34,7 @@ export default function AppLayout() {
   // A user with no workspace has nothing to open until they create one.
   return (
     <>
-      {list.length === 0 ? <Redirect href="/workspaces/new" /> : null}
+      {list.length === 0 && pathname !== '/workspaces/new' ? <Redirect href="/workspaces/new" /> : null}
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );

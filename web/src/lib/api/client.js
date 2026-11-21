@@ -152,6 +152,8 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd, locks = def
       if (res.status === 401 || res.status === 400) throw endSession();
       if (!res.ok) throw await errorOf(res);
       const raw = await res.json().catch(() => null);
+      // A body that stalls past the timeout reads as null, so say what went wrong.
+      if (abort.signal.aborted) throw new ApiError(0, MSG_NETWORK);
       if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, MSG_SERVER);
       tokens.save(raw.data);
     } catch (err) {
