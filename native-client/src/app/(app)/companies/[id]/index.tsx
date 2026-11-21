@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { router, useLocalSearchParams } from 'expo-router';
 import { recordsApi, type Contact } from '../../../../api/records';
 import { Button } from '../../../../components/Button';
+import { ActivityTimeline } from '../../../../components/ActivityTimeline';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { DetailCard, DetailRow } from '../../../../components/DetailCard';
 import { ErrorNotice } from '../../../../components/ErrorNotice';
@@ -158,6 +159,7 @@ export default function CompanyDetail() {
             {people.moreError ? <ErrorNotice message={people.moreError} onRetry={() => void pager.current?.more()} /> : null}
             <Button label="Add a person" variant="secondary" onPress={() => router.push(`/contacts/new?company=${company.id}`)} />
           </DetailCard>
+          {workspaceId ? <ActivityTimeline workspaceId={workspaceId} link={{ company_id: company.id }} /> : null}
           <Text style={{ color: theme.text2, fontSize: 13 }}>
             Added {date.format(new Date(company.created_at))} · Updated {date.format(new Date(company.updated_at))}
           </Text>

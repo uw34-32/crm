@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { toSentence } from '../lib/forms';
 import { validateContact, type ContactDraft } from '../lib/records/fields';
 import { Button } from './Button';
-import { CompanyPicker, type Choice } from './CompanyPicker';
+import { RecordPicker, type Choice } from './RecordPicker';
 import { ErrorNotice } from './ErrorNotice';
 import { Field, type TextInputHandle } from './Field';
 
@@ -45,7 +45,7 @@ export function ContactForm({ workspaceId, initial = {}, submitLabel, busy, erro
       <Field ref={emailInput} label="Email" value={email} onChangeText={setEmail} error={errors.email} autoCapitalize="none" autoComplete="email" keyboardType="email-address" returnKeyType="next" onSubmitEditing={() => phoneInput.current?.focus()} />
       <Field ref={phoneInput} label="Phone" value={phone} onChangeText={setPhone} error={errors.phone} autoComplete="tel" keyboardType="phone-pad" returnKeyType="next" onSubmitEditing={() => titleInput.current?.focus()} />
       <Field ref={titleInput} label="Job title" value={title} onChangeText={setTitle} error={errors.title} returnKeyType="done" />
-      <CompanyPicker workspaceId={workspaceId} value={company} onChange={setCompany} />
+      <RecordPicker workspaceId={workspaceId} value={company} onChange={setCompany} />
       <Button label={submitLabel} busy={busy} onPress={submit} />
       <Button label="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
     </View>

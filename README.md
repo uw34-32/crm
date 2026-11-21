@@ -443,7 +443,7 @@ Add `backend/pkg/migrate/migrations/NNN_name.sql`. Pending files run in version 
 
 ## Native app
 
-`native-client/` is an Expo (SDK 58) app with Expo Router, built with pnpm. So far it has the shell and auth (sign-in, registration, a workspace switcher, creating a workspace, and sign-out) and contacts and companies: a searchable, paged list of each, create, edit, and delete, a company picker on contacts, and a company's linked people. The pipeline, deals, and activities come next. It colors and types like the web app, with light and dark themes that follow the system setting.
+`native-client/` is an Expo (SDK 58) app with Expo Router, built with pnpm. So far it has the shell and auth (sign-in, registration, a workspace switcher, creating a workspace, and sign-out) and contacts and companies: a searchable, paged list of each, create, edit, and delete, a company picker on contacts, and a company's linked people. It also has the pipeline, deals, and activities: a board with one tab per stage and its total, moving a deal with a place in the stage and a reason for a lost one (undone if the API refuses it), won and lost deals in pages, deal create, edit, detail, and delete, and an activity timeline on deals, contacts, and companies with add, edit, complete, reopen, and delete. There is no drag and drop yet; a deal moves from its Move button. It colors and types like the web app, with light and dark themes that follow the system setting.
 
 ```sh
 cd native-client
@@ -464,7 +464,9 @@ The app calls the API at `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by defau
 | `native-client/src/services.ts` | The one session and workspace service, wired to the device |
 | `native-client/src/api/records.ts` | Contacts and companies routes of one workspace |
 | `native-client/src/lib/records/` | Field checks and request bodies, list paging, the people of a company, and the hooks behind each screen |
-| `native-client/src/components/` | Shared components: lists, forms, the company picker, and dialogs |
+| `native-client/src/api/crm.ts` | Pipelines, deals, activities, and members routes of one workspace |
+| `native-client/src/lib/deals/`, `native-client/src/lib/activities/` | Money, the board model and its state, deal and activity fields, and timeline grouping |
+| `native-client/src/components/` | Shared components: lists, forms, the record and member pickers, the deal board pieces, the activity timeline, and dialogs |
 | `native-client/src/lib/` | Device storage, a small store, and form checks |
 
 The client is a TypeScript port of the web client with the same rules: one refresh at a time, one retry after a 401, a refused token ends the session, and a lost connection, a timeout, or a 429 keeps it. A refresh that takes longer than 15 seconds is given up. There is no cross-tab lock, because a device runs one instance of the app.

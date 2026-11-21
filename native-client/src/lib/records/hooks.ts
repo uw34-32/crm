@@ -97,7 +97,7 @@ export function useRecord<T>(fetchOne: (workspaceId: string, id: string) => Prom
  * Leaves a screen that belongs to one workspace when another is opened: a record of the
  * old workspace does not exist in the new one.
  */
-export function useLeaveOnWorkspaceSwitch(listHref: '/contacts' | '/companies') {
+export function useLeaveOnWorkspaceSwitch(listHref: '/contacts' | '/companies' | '/pipeline') {
   const workspaceId = useWorkspaceId();
   // The workspace this screen first saw, which may arrive after it mounts.
   const first = useRef(workspaceId);

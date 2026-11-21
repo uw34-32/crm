@@ -12,12 +12,13 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border },
         // No icons yet: the labels carry the navigation.
         tabBarIconStyle: { display: 'none' },
-        tabBarLabelStyle: { fontSize: 15, fontWeight: '600', paddingVertical: 10 }
+        tabBarLabelStyle: { fontSize: 14, fontWeight: '600', paddingVertical: 10 }
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="contacts" options={{ title: 'Contacts' }} />
       <Tabs.Screen name="companies" options={{ title: 'Companies' }} />
+      <Tabs.Screen name="pipeline" options={{ title: 'Pipeline' }} />
     </Tabs>
   );
 }

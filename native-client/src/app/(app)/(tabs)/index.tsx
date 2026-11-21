@@ -16,7 +16,7 @@ export default function Home() {
         <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
           {current?.name ?? 'Workspace'}
         </Text>
-        <Text style={{ color: theme.text2 }}>Signed in as {user?.name} ({user?.email}). Contacts and companies are in the tabs below; deals and activities arrive next.</Text>
+        <Text style={{ color: theme.text2 }}>Signed in as {user?.name} ({user?.email}). Contacts, companies, and the pipeline are in the tabs below.</Text>
         <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>
           Workspaces
         </Text>

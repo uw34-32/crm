@@ -44,6 +44,9 @@ export default function AppLayout() {
         <Stack.Screen name="companies/new" />
         <Stack.Screen name="companies/[id]/index" />
         <Stack.Screen name="companies/[id]/edit" />
+        <Stack.Screen name="deals/new" />
+        <Stack.Screen name="deals/[id]/index" />
+        <Stack.Screen name="deals/[id]/edit" />
       </Stack>
     </>
   );

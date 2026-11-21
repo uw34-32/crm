@@ -6,7 +6,7 @@ import { Button } from '../../../components/Button';
 import { ErrorNotice } from '../../../components/ErrorNotice';
 import { ContactForm } from '../../../components/ContactForm';
 import { ScreenFrame } from '../../../components/ScreenFrame';
-import type { Choice } from '../../../components/CompanyPicker';
+import type { Choice } from '../../../components/RecordPicker';
 import { contactCreateBody, type ContactDraft } from '../../../lib/records/fields';
 import { recordsChanged } from '../../../lib/records/changes';
 import { useLeaveOnWorkspaceSwitch } from '../../../lib/records/hooks';

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { recordsApi } from '../../../../api/records';
+import { ActivityTimeline } from '../../../../components/ActivityTimeline';
 import { ConfirmDialog } from '../../../../components/ConfirmDialog';
 import { DetailCard, DetailRow } from '../../../../components/DetailCard';
 import { ErrorNotice } from '../../../../components/ErrorNotice';
@@ -105,6 +106,7 @@ export default function ContactDetail() {
               <Text style={{ color: theme.text2 }}>No email, phone, or company yet.</Text>
             )}
           </DetailCard>
+          {workspaceId ? <ActivityTimeline workspaceId={workspaceId} link={{ contact_id: contact.id }} /> : null}
           <Text style={{ color: theme.text2, fontSize: 13 }}>
             Added {date.format(new Date(contact.created_at))} · Updated {date.format(new Date(contact.updated_at))}
           </Text>
