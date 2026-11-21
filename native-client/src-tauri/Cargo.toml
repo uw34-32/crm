@@ -13,3 +13,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+
+[features]
+# Serve the embedded assets rather than devUrl. `tauri build` turns it on; a plain
+# `cargo build --release` needs `--features custom-protocol`.
+custom-protocol = ["tauri/custom-protocol"]

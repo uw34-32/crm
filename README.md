@@ -482,11 +482,13 @@ The tabs (Home, Contacts, Companies) hold the lists. A record's detail, create, 
 ```sh
 cd native-client
 pnpm install
-pnpm desktop            # tauri dev: starts the Expo web server on 8081 and opens the window
-pnpm desktop:build      # tauri build: exports the web app, compiles, and bundles
-npx tauri build --no-bundle   # just the binary: src-tauri/target/release/crm-desktop
+pnpm desktop                  # tauri dev: Expo web server on port 8081 (it fails if the port is taken) and the window
+pnpm desktop:build            # exports the web app, compiles, and bundles; extra arguments go to tauri build
+pnpm desktop:build --no-bundle   # just the binary: src-tauri/target/release/crm-desktop
 ```
+
+Build only through `pnpm desktop:build` (or `tauri build`): a plain `cargo build --release` loads the dev URL unless you pass `--features custom-protocol`.
 
 It needs Rust and, on Linux, the WebKitGTK 4.1 and GTK 3 development packages. The window's origin is `tauri://localhost` on Linux and macOS and `http://tauri.localhost` on Windows; `dev.sh` already allows both in `CORS_ORIGINS`. The API address is baked in at export time from `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by default, so a build for another API sets it first.
 
-The Content-Security-Policy allows requests to any `http:` or `https:` address, because the API's address is configuration, not a constant. Tauri adds a nonce to `style-src` and a browser then ignores `'unsafe-inline'`, which blocks the styles React Native Web injects at run time, so `dangerousDisableAssetCspModification` leaves `style-src` alone. Scripts keep Tauri's protection. The refresh token lives in `localStorage` inside the window's own data directory, with the tradeoff described under [Session and tokens](#session-and-tokens).
+`desktop:build` also writes the Content-Security-Policy for that build: the window may connect only to its own origin and to the API's origin, scripts must come from the app itself, and images from the app, `data:`, or `blob:`. A script that got into the page therefore cannot send the refresh token elsewhere. The committed `tauri.conf.json` carries the same policy for the default API, which `tauri dev` uses. Styles keep `'unsafe-inline'` and `dangerousDisableAssetCspModification` leaves `style-src` alone, because Tauri's nonce would otherwise make the browser ignore it and block the styles React Native Web injects at run time. The refresh token lives in `localStorage` inside the window's own data directory, with the tradeoff described under [Session and tokens](#session-and-tokens). The app shows no remote images; if one is added, `img-src` needs its origin.
