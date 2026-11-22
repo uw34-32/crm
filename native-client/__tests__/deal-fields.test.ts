@@ -5,7 +5,6 @@ const draft = {
   value: '1,250.50',
   currency: 'eur',
   pipeline_id: 'p1',
-  stage_id: 's1',
   expected_close_date: '2027-03-14',
   company_id: 'k1',
   contact_id: null,
@@ -18,7 +17,6 @@ const original = {
   value_minor: 125050,
   currency: 'EUR',
   pipeline_id: 'p1',
-  stage_id: 's1',
   expected_close_date: '2027-03-14',
   company_id: 'k1',
   contact_id: null,
@@ -58,15 +56,19 @@ describe('the create body', () => {
       value_minor: 125050,
       currency: 'EUR',
       pipeline_id: 'p1',
-      stage_id: 's1',
       expected_close_date: '2027-03-14',
       company_id: 'k1',
       owner_id: 'u1'
     });
   });
 
+  it('never sends a stage or a status: a new deal starts in the first open stage, and a won one is moved afterwards', () => {
+    expect(dealCreateBody({ ...draft, status: 'won' })).not.toHaveProperty('stage_id');
+    expect(dealCreateBody({ ...draft, status: 'won' })).not.toHaveProperty('status');
+  });
+
   it('lets the API pick the first open stage and the caller as owner when they are blank', () => {
-    const body = dealCreateBody({ ...draft, stage_id: '', expected_close_date: '', company_id: null, owner_id: '' , value: ''});
+    const body = dealCreateBody({ ...draft, expected_close_date: '', company_id: null, owner_id: '' , value: ''});
     expect(body).toEqual({ title: 'Acme renewal', value_minor: 0, currency: 'EUR', pipeline_id: 'p1' });
   });
 });
@@ -87,7 +89,7 @@ describe('the patch body', () => {
     });
   });
 
-  it('never sends the pipeline or the stage, which change only through a move', () => {
-    expect(dealPatchBody(original, { ...draft, pipeline_id: 'p2', stage_id: 's9' })).toEqual({});
+  it('never sends the pipeline or the status, which change only through a move', () => {
+    expect(dealPatchBody(original, { ...draft, pipeline_id: 'p2', status: 'won' })).toEqual({});
   });
 });

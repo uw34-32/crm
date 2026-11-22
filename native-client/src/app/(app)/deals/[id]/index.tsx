@@ -23,6 +23,13 @@ import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
 import { dateLocale, nameOf, t, useLocale } from '../../../../i18n';
 
+/** The stage's name, and its kind when the name does not already say it: "Ganado", but "Closed deal (won)". */
+function stageText(stage: { name: string; kind: string }): string {
+  const name = nameOf(stage.name);
+  const kind = stage.kind === 'won' ? t('won') : stage.kind === 'lost' ? t('lost') : '';
+  return kind && name.toLowerCase() !== kind ? `${name} (${kind})` : name;
+}
+
 const deals = dealsApi(session.api);
 const pipelines = pipelinesApi(session.api);
 const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
@@ -30,7 +37,7 @@ const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { date
 export default function DealDetail() {
   useLocale();
   const theme = useTheme();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, notice } = useLocalSearchParams<{ id: string; notice?: string }>();
   useLeaveOnWorkspaceSwitch('/pipeline');
   const [gone, setGone] = useState(false);
   const { state, workspaceId, reload } = useRecord(deals.get, id, { paused: gone });
@@ -131,7 +138,7 @@ export default function DealDetail() {
             {deal.value_minor > 0 ? <Text style={{ color: theme.text, fontSize: 20, fontWeight: '600' }}>{formatMoney(deal.value_minor, deal.currency)}</Text> : null}
           </View>
           <DetailCard title={t('Details')}>
-            <DetailRow label={t('Stage')} value={stage ? `${nameOf(stage.name)}${stage.kind === 'won' ? ` (${t('won')})` : stage.kind === 'lost' ? ` (${t('lost')})` : ''}` : stagesError ? t('Not available') : t('Loading…')} />
+            <DetailRow label={t('Stage')} value={stage ? stageText(stage) : stagesError ? t('Not available') : t('Loading…')} />
             {stagesError ? <ErrorNotice message={stagesError} /> : null}
             {pipeline ? <DetailRow label={t('Pipeline')} value={nameOf(pipeline.name)} /> : null}
             {stage?.kind === 'lost' && deal.lost_reason ? <DetailRow label={t('Lost because')} value={deal.lost_reason} /> : null}
@@ -140,6 +147,7 @@ export default function DealDetail() {
             {deal.owner_id ? <DetailRow label={t('Owner')} value={memberName(members, deal.owner_id)} /> : null}
             {deal.expected_close_date ? <DetailRow label={t('Expected close')} value={deal.expected_close_date} /> : null}
             {moveError ? <ErrorNotice message={moveError} /> : null}
+            {notice === 'not-won' && deal?.status === 'open' ? <ErrorNotice message={t('Added, but it could not be marked as won. Move it to Won from here.')} /> : null}
             <Button label={moveBusy ? t('Moving…') : t('Move to another stage')} variant="secondary" busy={moveBusy} disabled={!pipeline} onPress={() => setMoving(true)} />
           </DetailCard>
           <ActivityTimeline workspaceId={workspaceId} link={{ deal_id: deal.id }} />

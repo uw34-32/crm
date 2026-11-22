@@ -10,7 +10,7 @@ export type DealDraft = {
   value?: string;
   currency?: string;
   pipeline_id?: string;
-  stage_id?: string;
+  status?: string;
   expected_close_date?: string;
   company_id?: string | null;
   contact_id?: string | null;
@@ -65,7 +65,6 @@ export function dealCreateBody(draft: DealDraft) {
     currency,
     pipeline_id: text(draft.pipeline_id)
   };
-  if (text(draft.stage_id)) body.stage_id = text(draft.stage_id);
   if (text(draft.expected_close_date)) body.expected_close_date = text(draft.expected_close_date);
   for (const link of LINKS) {
     const id = text(draft[link]);

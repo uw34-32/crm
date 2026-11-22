@@ -1,10 +1,10 @@
 <script>
   import { nameOf, t } from '$lib/i18n.svelte.js';
-  // Creates or edits a deal. Creating also picks the pipeline and the stage it starts
-  // in; an existing deal changes stage only by moving, so editing leaves them out.
+  // Creates or edits a deal. Creating also picks the pipeline and whether the deal is in
+  // progress or already won; an existing deal changes stage only by moving, so editing
+  // leaves them out.
   // Checks mirror the API's limits and run on submit.
   import { tick, untrack } from 'svelte';
-  import { pipelinesApi } from '$lib/api/crm.js';
   import CompanyPicker from '$lib/components/CompanyPicker.svelte';
   import ContactPicker from '$lib/components/ContactPicker.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
@@ -12,7 +12,6 @@
   import { validateDeal } from '$lib/deals/fields.js';
   import { majorText } from '$lib/deals/money.js';
   import { members } from '$lib/members.svelte.js';
-  import { api } from '$lib/session.svelte.js';
 
   /** @typedef {import('$lib/deals/fields.js').DealDraft} DealDraft */
   /**
@@ -38,7 +37,7 @@
       currency: initial.currency ?? 'USD',
       value: initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '',
       pipeline_id: initial.pipeline_id ?? pipelines[0]?.id ?? '',
-      stage_id: '',
+      status: 'open',
       expected_close_date: initial.expected_close_date ?? '',
       owner_id: initial.owner_id ?? ''
     }))
@@ -49,30 +48,6 @@
   let errors = $state({});
   /** @type {HTMLElement | null} */
   let notice = $state(null);
-
-  /** Open stages of the chosen pipeline, for the starting stage. @type {{ id: string, name: string }[]} */
-  let stages = $state([]);
-  let stagesError = $state('');
-  let stagesFor = '';
-
-  $effect(() => {
-    const pipelineId = draft.pipeline_id;
-    if (!creating || !pipelineId || pipelineId === stagesFor) return;
-    stagesFor = pipelineId;
-    untrack(async () => {
-      stagesError = '';
-      try {
-        const pipeline = /** @type {{ stages?: { id: string, name: string, kind: string }[] }} */ (await pipelinesApi(api).get(workspaceId, pipelineId));
-        if (stagesFor !== pipelineId) return;
-        stages = (pipeline.stages ?? []).filter((stage) => stage.kind === 'open');
-        draft.stage_id = '';
-      } catch {
-        if (stagesFor !== pipelineId) return;
-        stages = [];
-        stagesError = t('The stages could not be loaded. The deal will start in the first stage.');
-      }
-    });
-  });
 
   $effect(() => {
     if (formError) tick().then(() => notice?.focus());
@@ -114,14 +89,12 @@
         {#if errors.pipeline_id}<p class="form-error">{errors.pipeline_id}</p>{/if}
       </div>
       <div class="form-group">
-        <label class="form-label" for="deal-stage_id">{t('Starting stage')}</label>
-        <select id="deal-stage_id" class="select" bind:value={draft.stage_id} aria-describedby={stagesError ? 'deal-stage-error' : undefined}>
-          <option value="">{t('First stage')}</option>
-          {#each stages as stage (stage.id)}
-            <option value={stage.id}>{nameOf(stage.name)}</option>
-          {/each}
+        <label class="form-label" for="deal-status">{t('Status')}</label>
+        <select id="deal-status" class="select" bind:value={draft.status} aria-describedby="deal-status-hint">
+          <option value="open">{t('In progress')}</option>
+          <option value="won">{nameOf('Won')}</option>
         </select>
-        {#if stagesError}<p class="form-error" id="deal-stage-error">{stagesError}</p>{/if}
+        <p class="form-hint" id="deal-status-hint">{t('Choose Won to record a sale that is already closed.')}</p>
       </div>
     </div>
   {/if}

@@ -6,6 +6,7 @@ import { DealForm } from '../../../components/DealForm';
 import { ErrorNotice } from '../../../components/ErrorNotice';
 import { ScreenFrame } from '../../../components/ScreenFrame';
 import { dealCreateBody, type DealDraft } from '../../../lib/deals/fields';
+import { markWon } from '../../../lib/deals/won';
 import { recordsChanged } from '../../../lib/records/changes';
 import { useWorkspaceId } from '../../../lib/records/hooks';
 import { isMissing } from '../../../lib/records/load';
@@ -47,6 +48,17 @@ export default function NewDeal() {
     setError('');
     try {
       const deal = await deals.create(workspaceId, dealCreateBody(draft));
+      if (draft.status === 'won') {
+        // The API starts a deal in an open stage; the sale is closed by moving it.
+        const marked = await markWon(deals, pipelines, workspaceId, deal.id, draft.pipeline_id ?? '').then(
+          () => true,
+          () => false
+        );
+        recordsChanged();
+        // The deal exists either way; its page says when the move to Won did not happen.
+        router.replace(marked ? `/deals/${deal.id}` : `/deals/${deal.id}?notice=not-won`);
+        return;
+      }
       recordsChanged();
       router.replace(`/deals/${deal.id}`);
     } catch (err) {

@@ -7,6 +7,7 @@
   import DealForm from '$lib/components/DealForm.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import { dealCreateBody } from '$lib/deals/fields.js';
+  import { markWon } from '$lib/deals/won.js';
   import { toSentence } from '$lib/forms.js';
   import { loadMembers } from '$lib/members.svelte.js';
   import { isMissing } from '$lib/records/load.js';
@@ -39,7 +40,17 @@
     formError = '';
     try {
       const deal = /** @type {{ id: string, title: string }} */ (await deals.create(workspaceId, dealCreateBody(draft)));
-      showToast(t('Added {name}', { name: deal.title }));
+      if (draft.status === 'won') {
+        // The API starts a deal in an open stage; the sale is closed by moving it.
+        try {
+          await markWon(deals, pipelinesApi(api), workspaceId, deal.id, draft.pipeline_id ?? '');
+          showToast(t('Added {name} as won', { name: deal.title }));
+        } catch (err) {
+          showToast(`${t('Added {name}, but it could not be marked as won. Move it to Won from its page.', { name: deal.title })} ${toSentence(err instanceof Error ? err.message : String(err))}`, 6000);
+        }
+      } else {
+        showToast(t('Added {name}', { name: deal.title }));
+      }
       await goto(`/deals/${deal.id}`, { replaceState: true });
     } catch (err) {
       formError = isMissing(err)
@@ -57,7 +68,7 @@
 
 <div class="animate-in">
   <h1 class="page-title">{t('New deal')}</h1>
-  <p class="page-lede">{t('A title and a currency are enough to start. The deal goes to the end of its first stage.')}</p>
+  <p class="page-lede">{t('A title and a currency are enough to start. To record a sale that is already closed, set the status to Won.')}</p>
   {#await pipelines}
     <div aria-busy="true">
       <p class="sr-only" role="status">{t('Loading the pipelines')}</p>

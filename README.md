@@ -506,3 +506,7 @@ The English text is the key: `t('Sign in')` is English as it stands, and the Spa
 - The names a workspace's first pipeline starts with (Sales, Lead, Qualified, Proposal, Negotiation, Won, Lost) are translated through `nameOf`; a name someone typed stays as typed. Contact, company, and deal data are never translated.
 - The API's messages are English. The clients translate the ones listed in the tables (`invalid email or password`, `workspace not found`, and so on) and show any other as the server wrote it.
 - Dates follow the language. Money amounts still use the browser's or device's own format.
+
+## Recording a sale that is already closed
+
+New deal has a **Status** field: *In progress* (the default) or *Won*. The API starts every new deal in an open stage, so choosing Won creates the deal and then moves it to the pipeline's won stage. If the move fails, the deal still exists in its first stage and the app says so, so it can be moved from its page. Lost deals are recorded by moving a deal to Lost, which asks for the reason.
