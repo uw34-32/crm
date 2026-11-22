@@ -21,10 +21,11 @@ import { isMissing } from '../../../../lib/records/load';
 import { memberName } from '../../../../lib/activities/timeline';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
+import { dateLocale, nameOf, t } from '../../../../i18n';
 
 const deals = dealsApi(session.api);
 const pipelines = pipelinesApi(session.api);
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function DealDetail() {
   const theme = useTheme();
@@ -60,7 +61,7 @@ export default function DealDetail() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  if (state.status === 'missing') return <NotFound title="Deal not found" backHref="/pipeline" backLabel="pipeline" />;
+  if (state.status === 'missing') return <NotFound title={t('Deal not found')} backHref="/pipeline" backLabel={t('pipeline')} />;
 
   async function moveTo({ stageId, lostReason }: { stageId: string; lostReason: string }) {
     if (!deal || !workspaceId) return;
@@ -100,13 +101,13 @@ export default function DealDetail() {
 
   return (
     <ScreenFrame
-      backLabel="Pipeline"
+      backLabel={t('Pipeline')}
       backHref="/pipeline"
       actions={
         deal ? (
           <>
-            <TextAction label="Edit" onPress={() => router.push(`/deals/${deal.id}/edit`)} />
-            <TextAction label="Delete" danger onPress={() => setConfirming(true)} />
+            <TextAction label={t('Edit')} onPress={() => router.push(`/deals/${deal.id}/edit`)} />
+            <TextAction label={t('Delete')} danger onPress={() => setConfirming(true)} />
           </>
         ) : null
       }
@@ -114,12 +115,12 @@ export default function DealDetail() {
       {state.status === 'error' ? (
         <>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-            Deal
+            {t('Deal')}
           </Text>
           <ErrorNotice message={state.error} onRetry={() => void reload()} />
         </>
       ) : !deal || !workspaceId ? (
-        <ActivityIndicator accessibilityLabel="Loading the deal" />
+        <ActivityIndicator accessibilityLabel={t('Loading the deal')} />
       ) : (
         <>
           <View style={{ gap: 4 }}>
@@ -128,21 +129,21 @@ export default function DealDetail() {
             </Text>
             {deal.value_minor > 0 ? <Text style={{ color: theme.text, fontSize: 20, fontWeight: '600' }}>{formatMoney(deal.value_minor, deal.currency)}</Text> : null}
           </View>
-          <DetailCard title="Details">
-            <DetailRow label="Stage" value={stage ? `${stage.name}${stage.kind === 'won' ? ' (won)' : stage.kind === 'lost' ? ' (lost)' : ''}` : stagesError ? 'Not available' : 'Loading…'} />
+          <DetailCard title={t('Details')}>
+            <DetailRow label={t('Stage')} value={stage ? `${nameOf(stage.name)}${stage.kind === 'won' ? ` (${t('won')})` : stage.kind === 'lost' ? ` (${t('lost')})` : ''}` : stagesError ? t('Not available') : t('Loading…')} />
             {stagesError ? <ErrorNotice message={stagesError} /> : null}
-            {pipeline ? <DetailRow label="Pipeline" value={pipeline.name} /> : null}
-            {stage?.kind === 'lost' && deal.lost_reason ? <DetailRow label="Lost because" value={deal.lost_reason} /> : null}
-            {deal.company_name && deal.company_id ? <DetailRow label="Company" value={deal.company_name} onPress={() => router.push(`/companies/${deal.company_id}`)} /> : null}
-            {deal.contact_name && deal.contact_id ? <DetailRow label="Contact" value={deal.contact_name} onPress={() => router.push(`/contacts/${deal.contact_id}`)} /> : null}
-            {deal.owner_id ? <DetailRow label="Owner" value={memberName(members, deal.owner_id)} /> : null}
-            {deal.expected_close_date ? <DetailRow label="Expected close" value={deal.expected_close_date} /> : null}
+            {pipeline ? <DetailRow label={t('Pipeline')} value={nameOf(pipeline.name)} /> : null}
+            {stage?.kind === 'lost' && deal.lost_reason ? <DetailRow label={t('Lost because')} value={deal.lost_reason} /> : null}
+            {deal.company_name && deal.company_id ? <DetailRow label={t('Company')} value={deal.company_name} onPress={() => router.push(`/companies/${deal.company_id}`)} /> : null}
+            {deal.contact_name && deal.contact_id ? <DetailRow label={t('Contact')} value={deal.contact_name} onPress={() => router.push(`/contacts/${deal.contact_id}`)} /> : null}
+            {deal.owner_id ? <DetailRow label={t('Owner')} value={memberName(members, deal.owner_id)} /> : null}
+            {deal.expected_close_date ? <DetailRow label={t('Expected close')} value={deal.expected_close_date} /> : null}
             {moveError ? <ErrorNotice message={moveError} /> : null}
-            <Button label={moveBusy ? 'Moving…' : 'Move to another stage'} variant="secondary" busy={moveBusy} disabled={!pipeline} onPress={() => setMoving(true)} />
+            <Button label={moveBusy ? t('Moving…') : t('Move to another stage')} variant="secondary" busy={moveBusy} disabled={!pipeline} onPress={() => setMoving(true)} />
           </DetailCard>
           <ActivityTimeline workspaceId={workspaceId} link={{ deal_id: deal.id }} />
           <Text style={{ color: theme.text2, fontSize: 13 }}>
-            Added {date.format(new Date(deal.created_at))} · Updated {date.format(new Date(deal.updated_at))}
+            {t('Added {date}', { date: formatDate(new Date(deal.created_at)) })} · {t('Updated {date}', { date: formatDate(new Date(deal.updated_at)) })}
           </Text>
           {moving && pipeline ? (
             <MoveDealSheet deal={deal as never} columns={buildColumns(pipeline.stages ?? [], [deal as never])} showPlace={false} onCancel={() => setMoving(false)} onMove={(t) => void moveTo(t)} />
@@ -151,9 +152,9 @@ export default function DealDetail() {
       )}
       <ConfirmDialog
         visible={confirming}
-        title={`Delete ${deal?.title ?? 'this deal'}?`}
-        message="The deal is removed from the pipeline. Its activity stays in the history of its company and contact."
-        confirmLabel="Delete deal"
+        title={t('Delete {name}?', { name: deal?.title ?? t('this deal') })}
+        message={t('The deal is removed from the pipeline. Its activity stays in the history of its company and contact.')}
+        confirmLabel={t('Delete deal')}
         busy={deleting}
         error={deleteError}
         onConfirm={() => void remove()}

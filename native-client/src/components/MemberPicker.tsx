@@ -3,10 +3,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMembers } from '../lib/members';
 import { radius, useTheme } from '../theme';
+import { t } from '../i18n';
 
 type Props = { label: string; workspaceId: string; value: string; onChange: (userId: string) => void; emptyLabel?: string };
 
-export function MemberPicker({ label, workspaceId, value, onChange, emptyLabel = 'Nobody' }: Props) {
+export function MemberPicker({ label, workspaceId, value, onChange, emptyLabel = t('Nobody') }: Props) {
   const theme = useTheme();
   const { members, status, retry } = useMembers(workspaceId);
   const options = [{ id: '', name: emptyLabel }, ...members.map((m) => ({ id: m.user_id, name: m.name?.trim() || m.email }))];
@@ -15,7 +16,7 @@ export function MemberPicker({ label, workspaceId, value, onChange, emptyLabel =
       <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       {status === 'error' ? (
         <Pressable accessibilityRole="button" onPress={() => void retry()}>
-          <Text style={{ color: theme.dangerText }}>The members could not be loaded. Tap to try again.</Text>
+          <Text style={{ color: theme.dangerText }}>{t('The members could not be loaded. Tap to try again.')}</Text>
         </Pressable>
       ) : null}
       <View style={styles.chips}>

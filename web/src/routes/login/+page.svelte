@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount, tick } from 'svelte';
@@ -47,22 +48,22 @@
 </script>
 
 <svelte:head>
-  <title>Sign in · CRM</title>
+  <title>{t('Sign in · CRM')}</title>
 </svelte:head>
 
-<AuthCard title="Sign in">
+<AuthCard title={t('Sign in')}>
   {#if session.ended && !formError}
-    <p class="ended" role="status">Your session has ended. Sign in again to continue.</p>
+    <p class="ended" role="status">{t('Your session has ended. Sign in again to continue.')}</p>
   {/if}
   {#if formError}
     <ErrorNotice message={formError} bind:element={notice} />
   {/if}
 
   <form novalidate onsubmit={submit}>
-    <Field id="email" label="Email" type="email" autocomplete="email" required bind:value={email} error={errors.email} />
+    <Field id="email" label={t('Email')} type="email" autocomplete="email" required bind:value={email} error={errors.email} />
     <Field
       id="password"
-      label="Password"
+      label={t('Password')}
       type="password"
       autocomplete="current-password"
       required
@@ -75,7 +76,7 @@
   </form>
 
   {#snippet footer()}
-    New here? <a href="/register{page.url.search}">Create an account</a>
+    {t('New here?')} <a href="/register{page.url.search}">{t('Create an account')}</a>
   {/snippet}
 </AuthCard>
 

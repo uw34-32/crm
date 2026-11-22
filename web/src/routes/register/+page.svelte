@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount, tick } from 'svelte';
@@ -29,7 +30,7 @@
     event.preventDefault();
     formError = '';
     errors = {
-      name: checkName(name, 'Enter your name.'),
+      name: checkName(name, t('Enter your name.')),
       email: checkEmail(email),
       password: checkPassword(password, { creating: true })
     };
@@ -43,7 +44,7 @@
       await register({ name: name.trim(), email: email.trim(), password });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        errors.email = 'An account with this email already exists. Sign in instead.';
+        errors.email = t('An account with this email already exists. Sign in instead.');
         document.getElementById('email')?.focus();
         return;
       }
@@ -57,24 +58,24 @@
 </script>
 
 <svelte:head>
-  <title>Create an account · CRM</title>
+  <title>{t('Create an account · CRM')}</title>
 </svelte:head>
 
-<AuthCard title="Create an account">
+<AuthCard title={t('Create an account')}>
   {#if formError}
     <ErrorNotice message={formError} bind:element={notice} />
   {/if}
 
   <form novalidate onsubmit={submit}>
-    <Field id="name" label="Name" autocomplete="name" required bind:value={name} error={errors.name} />
-    <Field id="email" label="Email" type="email" autocomplete="email" required bind:value={email} error={errors.email} />
+    <Field id="name" label={t('Name')} autocomplete="name" required bind:value={name} error={errors.name} />
+    <Field id="email" label={t('Email')} type="email" autocomplete="email" required bind:value={email} error={errors.email} />
     <Field
       id="password"
-      label="Password"
+      label={t('Password')}
       type="password"
       autocomplete="new-password"
       required
-      hint="At least 8 characters."
+      hint={t('At least 8 characters.')}
       bind:value={password}
       error={errors.password}
     />
@@ -84,6 +85,6 @@
   </form>
 
   {#snippet footer()}
-    Already have an account? <a href="/login{page.url.search}">Sign in</a>
+    {t('Already have an account?')} <a href="/login{page.url.search}">{t('Sign in')}</a>
   {/snippet}
 </AuthCard>

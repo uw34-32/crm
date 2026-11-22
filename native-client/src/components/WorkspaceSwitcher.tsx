@@ -3,13 +3,14 @@ import { Link } from 'expo-router';
 import { useStore } from '../lib/store';
 import { workspaces } from '../services';
 import { radius, useTheme } from '../theme';
+import { roleLabel, t } from '../i18n';
 
 /** Every workspace the user belongs to, with the open one marked. */
 export function WorkspaceSwitcher() {
   const theme = useTheme();
   const { list, current } = useStore(workspaces.state);
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel="Workspaces" style={styles.list}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={t('Workspaces')} style={styles.list}>
       {list.map((workspace) => {
         const selected = workspace.id === current?.id;
         return (
@@ -21,12 +22,12 @@ export function WorkspaceSwitcher() {
             style={[styles.row, { backgroundColor: theme.surface, borderColor: selected ? theme.accent : theme.border }]}
           >
             <Text style={[styles.name, { color: theme.text }]}>{workspace.name}</Text>
-            <Text style={{ color: theme.text2 }}>{selected ? `${workspace.role} · open` : workspace.role}</Text>
+            <Text style={{ color: theme.text2 }}>{selected ? `${roleLabel(workspace.role)} · ${t('open')}` : roleLabel(workspace.role)}</Text>
           </Pressable>
         );
       })}
       <Link href="/workspaces/new" style={{ color: theme.accentText, paddingVertical: 8 }}>
-        New workspace
+        {t('New workspace')}
       </Link>
     </View>
   );

@@ -11,6 +11,7 @@ import { session } from '../services';
 import { radius, useTheme } from '../theme';
 import { Button } from './Button';
 import { Field } from './Field';
+import { t } from '../i18n';
 
 export type Choice = { id: string; name: string };
 
@@ -34,7 +35,7 @@ const choiceOf = (kind: 'companies' | 'contacts', record: Company | Contact): Ch
     ? { id: record.id, name: contactName(record as Contact), detail: (record as Contact).company_name ?? (record as Contact).email ?? '' }
     : { id: record.id, name: (record as Company).name, detail: (record as Company).domain ?? '' };
 
-export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ? 'Contact' : 'Company', workspaceId, value, onChange, error = '' }: Props) {
+export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ? t('Contact') : t('Company'), workspaceId, value, onChange, error = '' }: Props) {
   const noun = nounOf[kind];
   const theme = useTheme();
   const [query, setQuery] = useState('');
@@ -78,7 +79,7 @@ export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ?
           <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{value.name}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Remove ${value.name}`}
+            accessibilityLabel={t('Remove {name}', { name: value.name })}
             hitSlop={8}
             onPress={() => {
               onChange(null);
@@ -86,7 +87,7 @@ export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ?
               setStatus('idle');
             }}
           >
-            <Text style={{ color: theme.dangerText, fontWeight: '600' }}>Remove</Text>
+            <Text style={{ color: theme.dangerText, fontWeight: '600' }}>{t('Remove')}</Text>
           </Pressable>
         </View>
         {error ? <Text style={{ color: theme.dangerText, fontSize: 13 }}>{error}</Text> : null}
@@ -100,7 +101,7 @@ export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ?
         label={label}
         value={query}
         error={error}
-        placeholder={`Search ${noun}`}
+        placeholder={t('Search {noun}', { noun: t(noun) })}
         autoCapitalize="none"
         autoCorrect={false}
         onFocus={() => status === 'idle' && void search(query)}
@@ -109,9 +110,9 @@ export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ?
           void search(text);
         }}
       />
-      {status === 'loading' ? <ActivityIndicator accessibilityLabel={`Searching ${noun}`} /> : null}
-      {status === 'error' ? <Text style={{ color: theme.dangerText }}>The {noun} could not be loaded. Keep typing to try again.</Text> : null}
-      {status === 'ready' && options.length === 0 ? <Text style={{ color: theme.text2 }}>No {noun} match. Add one first, then link it here.</Text> : null}
+      {status === 'loading' ? <ActivityIndicator accessibilityLabel={t('Searching {noun}', { noun: t(noun) })} /> : null}
+      {status === 'error' ? <Text style={{ color: theme.dangerText }}>{t('The {noun} could not be loaded. Keep typing to try again.', { noun: t(noun) })}</Text> : null}
+      {status === 'ready' && options.length === 0 ? <Text style={{ color: theme.text2 }}>{t('No {noun} match. Add one first, then link it here.', { noun: t(noun) })}</Text> : null}
       {status === 'ready'
         ? options.map((option) => (
             <Pressable
@@ -128,7 +129,7 @@ export function RecordPicker({ kind = 'companies', label = kind === 'contacts' ?
             </Pressable>
           ))
         : null}
-      {status === 'ready' && options.length === 0 && query ? <Button label="Clear search" variant="secondary" onPress={() => { setQuery(''); void search(''); }} /> : null}
+      {status === 'ready' && options.length === 0 && query ? <Button label={t('Clear search')} variant="secondary" onPress={() => { setQuery(''); void search(''); }} /> : null}
     </View>
   );
 }

@@ -2,6 +2,7 @@
 // its stages and deals, and moves that show at once and are undone if the API refuses
 // them. Call it while a component initializes, since it sets up effects.
 
+import { t } from '../i18n.svelte.js';
 import { untrack } from 'svelte';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
@@ -177,7 +178,7 @@ export function boardScreen() {
     } catch (err) {
       if (mine !== generation) return;
       board.columns = undoMove(board.columns, dealId, plan.from);
-      showToast(`The move was undone. ${toSentence(messageOf(err))}`, 5000);
+      showToast(`${t('The move was undone.')} ${toSentence(messageOf(err))}`, 5000);
       if (isMissing(err) && board.pipeline) load(board.pipeline.id);
     } finally {
       if (mine === generation) delete board.busy[dealId];

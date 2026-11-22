@@ -1,4 +1,5 @@
 <script>
+  import { dateLocale, t } from '$lib/i18n.svelte.js';
   import { ArrowLeft, Pencil, Plus, Trash2 } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
@@ -22,7 +23,7 @@
   const id = $derived(page.params.id ?? '');
   const screen = recordScreen('companies', companies, () => id);
   const company = $derived(screen.state.status === 'ready' ? screen.state.record : null);
-  const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+  const date = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(date) };
 
   // The contacts API has no company filter, so this searches for the company's name,
   // which every linked contact matches, and keeps the ones linked to this company.
@@ -71,7 +72,7 @@
       }
     }
     confirming = false;
-    showToast(`Deleted ${company.name}`);
+    showToast(t('Deleted {name}', { name: company.name }));
     await goto(screen.backHref(), { replaceState: true });
   }
 
@@ -80,26 +81,26 @@
 </script>
 
 <svelte:head>
-  <title>{company?.name ?? 'Company'} · CRM</title>
+  <title>{company?.name ?? t('Company')} · CRM</title>
 </svelte:head>
 
 {#if screen.state.status === 'missing'}
-  <NotFound title="Company not found" backHref={screen.backHref()} backLabel="Back to companies" />
+  <NotFound title={t('Company not found')} backHref={screen.backHref()} backLabel="Back to companies" />
 {:else}
   <div class="detail-header">
-    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> Companies</a>
+    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> {t('Companies')}</a>
     {#if company}
       <div class="detail-actions">
-        <a class="btn-ghost" href="/companies/{company.id}/edit"><Pencil size={18} aria-hidden="true" /> Edit</a>
+        <a class="btn-ghost" href="/companies/{company.id}/edit"><Pencil size={18} aria-hidden="true" /> {t('Edit')}</a>
         <button type="button" class="btn-ghost danger" onclick={() => (confirming = true)}>
-          <Trash2 size={18} aria-hidden="true" /> Delete
+          <Trash2 size={18} aria-hidden="true" /> {t('Delete')}
         </button>
       </div>
     {/if}
   </div>
 
   {#if screen.state.status === 'error'}
-    <h1 class="page-title">Company</h1>
+    <h1 class="page-title">{t('Company')}</h1>
     <ErrorNotice message={screen.state.error} onretry={screen.reload} />
   {:else if company}
     <div class="animate-in">
@@ -113,52 +114,52 @@
 
       <section class="section-card" aria-labelledby="company-details">
         <div class="section-card-header">
-          <h2 id="company-details" class="section-card-title">Details</h2>
+          <h2 id="company-details" class="section-card-title">{t('Details')}</h2>
         </div>
         {#if company.domain || company.phone || company.address}
           <dl class="section-card-body">
             {#if company.domain}
               <div class="field-row">
-                <dt class="field-label">Website</dt>
+                <dt class="field-label">{t('Website')}</dt>
                 <dd class="field-value"><a href={siteOf(company.domain)} target="_blank" rel="noopener noreferrer">{company.domain}</a></dd>
               </div>
             {/if}
             {#if company.phone}
               <div class="field-row">
-                <dt class="field-label">Phone</dt>
+                <dt class="field-label">{t('Phone')}</dt>
                 <dd class="field-value"><a href="tel:{company.phone}">{company.phone}</a></dd>
               </div>
             {/if}
             {#if company.address}
               <div class="field-row">
-                <dt class="field-label">Address</dt>
+                <dt class="field-label">{t('Address')}</dt>
                 <dd class="field-value address">{company.address}</dd>
               </div>
             {/if}
           </dl>
         {:else}
-          <p class="section-card-body muted">No website, phone, or address yet. <a href="/companies/{company.id}/edit">Add details</a></p>
+          <p class="section-card-body muted">{t('No website, phone, or address yet.')} <a href="/companies/{company.id}/edit">{t('Add details')}</a></p>
         {/if}
       </section>
 
       <section class="section-card" aria-labelledby="company-people">
         <div class="section-card-header">
-          <h2 id="company-people" class="section-card-title">People</h2>
-          <a class="card-action" href="/contacts/new?company={company.id}"><Plus size={16} aria-hidden="true" /> Add a person</a>
+          <h2 id="company-people" class="section-card-title">{t('People')}</h2>
+          <a class="card-action" href="/contacts/new?company={company.id}"><Plus size={16} aria-hidden="true" /> {t('Add a person')}</a>
         </div>
         {#if people.status === 'error'}
           <div class="section-card-body"><ErrorNotice message={people.error} onretry={() => loadPeople(company.name)} /></div>
         {:else if people.status !== 'ready'}
           <div class="section-card-body" aria-busy="true">
-            <p class="sr-only" role="status">Loading the people at {company.name}</p>
+            <p class="sr-only" role="status">{t('Loading the people at {name}', { name: company.name })}</p>
             <span class="skeleton skeleton-line" style="display:block;width:50%;margin-bottom:10px"></span>
             <span class="skeleton skeleton-line" style="display:block;width:35%"></span>
           </div>
         {:else if people.items.length === 0 && !people.hasMore}
-          <p class="section-card-body muted">Nobody is linked to {company.name} yet.</p>
+          <p class="section-card-body muted">{t('Nobody is linked to {name} yet.', { name: company.name })}</p>
         {:else}
           {#if people.items.length === 0}
-            <p class="section-card-body muted">Nobody linked to {company.name} has turned up yet.</p>
+            <p class="section-card-body muted">{t('Nobody linked to {name} has turned up yet.', { name: company.name })}</p>
           {/if}
           <ul class="people">
             {#each people.items as person (person.id)}
@@ -188,11 +189,11 @@
 
       <ActivityTimeline workspaceId={screen.workspaceId} link={{ company_id: company.id }} subjectName={company.name} />
 
-      <p class="detail-meta">Added {date.format(new Date(company.created_at))} · Updated {date.format(new Date(company.updated_at))}</p>
+      <p class="detail-meta">{t('Added {date}', { date: date.format(new Date(company.created_at)) })} · {t('Updated {date}', { date: date.format(new Date(company.updated_at)) })}</p>
     </div>
   {:else}
     <div aria-busy="true">
-      <p class="sr-only" role="status">Loading the company</p>
+      <p class="sr-only" role="status">{t('Loading the company')}</p>
       <div class="detail-hero">
         <span class="skeleton" style="width:64px;height:64px;border-radius:16px"></span>
         <span class="skeleton" style="width:200px;height:28px"></span>
@@ -204,10 +205,10 @@
 
 <ConfirmDialog
   open={confirming}
-  title="Delete {company?.name ?? 'this company'}?"
-  message="The people linked to it stay in your contacts and lose the link. Deals keep their history without the company."
-  confirmLabel="Delete company"
-  busyLabel="Deleting…"
+  title={t('Delete {name}?', { name: company?.name ?? t('this company') })}
+  message={t('The people linked to it stay in your contacts and lose the link. Deals keep their history without the company.')}
+  confirmLabel={t('Delete company')}
+  busyLabel={t('Deleting…')}
   busy={deleting}
   error={deleteError}
   onconfirm={remove}

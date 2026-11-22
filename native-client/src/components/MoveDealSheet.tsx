@@ -8,6 +8,7 @@ import { radius, useTheme } from '../theme';
 import { Button } from './Button';
 import { Field } from './Field';
 import { OptionChips } from './OptionChips';
+import { nameOf, t } from '../i18n';
 
 export type MoveTarget = { stageId: string; before: string | null; lostReason: string };
 
@@ -36,8 +37,8 @@ export function MoveDealSheet({ deal, columns, showPlace = true, onMove, onCance
   function submit() {
     if (!target) return;
     const lostReason = reason.trim();
-    if (askReason && !lostReason) return setError('Say why it was lost.');
-    if (askReason && [...lostReason].length > DEAL_LIMITS.lost_reason) return setError(`Use at most ${DEAL_LIMITS.lost_reason} characters.`);
+    if (askReason && !lostReason) return setError(t('Say why it was lost.'));
+    if (askReason && [...lostReason].length > DEAL_LIMITS.lost_reason) return setError(t('Use at most {n} characters.', { n: DEAL_LIMITS.lost_reason }));
     // Staying put in the same stage is a keep; a new stage defaults to the end.
     const effective: Place = place === 'keep' && !sameStage ? 'end' : place;
     const index = effective === 'start' ? 0 : effective === 'end' ? others.length : (columns.find((c) => c.stage.id === deal.stage_id)?.deals.findIndex((d) => d.id === deal.id) ?? 0);
@@ -47,16 +48,16 @@ export function MoveDealSheet({ deal, columns, showPlace = true, onMove, onCance
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable accessibilityLabel="Close dialog" style={styles.backdrop} onPress={onCancel}>
+      <Pressable accessibilityLabel={t('Close dialog')} style={styles.backdrop} onPress={onCancel}>
         <Pressable accessibilityViewIsModal style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={() => {}}>
           <ScrollView contentContainerStyle={{ gap: 14 }} keyboardShouldPersistTaps="handled">
             <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
               Move {deal.title}
             </Text>
             <OptionChips
-              label="Stage"
+              label={t('Stage')}
               value={stageId}
-              options={columns.map((c) => ({ value: c.stage.id, label: c.stage.name }))}
+              options={columns.map((c) => ({ value: c.stage.id, label: nameOf(c.stage.name) }))}
               onChange={(id) => {
                 setStageId(id);
                 setPlace('keep');
@@ -65,24 +66,24 @@ export function MoveDealSheet({ deal, columns, showPlace = true, onMove, onCance
             />
             {showPlace ? (
               <OptionChips
-                label="Place"
+                label={t('Place')}
                 value={place === 'keep' && !sameStage ? 'end' : place}
                 options={[
-                  ...(sameStage ? ([{ value: 'keep', label: 'Where it is' }] as const) : []),
-                  { value: 'start', label: 'At the top' },
-                  { value: 'end', label: 'At the bottom' }
+                  ...(sameStage ? ([{ value: 'keep', label: t('Where it is') }] as const) : []),
+                  { value: 'start', label: t('At the top') },
+                  { value: 'end', label: t('At the bottom') }
                 ]}
                 onChange={setPlace}
               />
             ) : null}
             {askReason ? (
-              <Field label="Why was it lost?" value={reason} onChangeText={setReason} error={error} multiline />
+              <Field label={t('Why was it lost?')} value={reason} onChangeText={setReason} error={error} multiline />
             ) : error ? (
               <Text style={{ color: theme.dangerText }}>{error}</Text>
             ) : null}
             <View style={{ gap: 10 }}>
-              <Button label="Move deal" onPress={submit} />
-              <Button label="Cancel" variant="secondary" onPress={onCancel} />
+              <Button label={t('Move deal')} onPress={submit} />
+              <Button label={t('Cancel')} variant="secondary" onPress={onCancel} />
             </View>
           </ScrollView>
         </Pressable>

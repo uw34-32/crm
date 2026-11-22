@@ -2,6 +2,8 @@
 // stores them. These turn them into text for the screen and back from a form.
 
 /** The API's upper bound on value_minor. */
+import { t } from '../../i18n';
+
 export const MAX_MINOR = 999_999_999_999_999;
 
 const AMOUNT_SHAPE = /^\d+(\.\d+)?$/;
@@ -42,16 +44,16 @@ export function formatMoney(minor: number, currency: string, locale?: string, { 
 export function parseMoney(text: string, currency: string): { minor: number; error?: undefined } | { error: string; minor?: undefined } {
   const cleaned = text.replaceAll(',', '').replaceAll(/\s/g, '');
   if (!cleaned) return { minor: 0 };
-  if (!AMOUNT_SHAPE.test(cleaned)) return { error: 'Enter an amount such as 1250 or 1250.50.' };
+  if (!AMOUNT_SHAPE.test(cleaned)) return { error: t('Enter an amount such as 1250 or 1250.50.') };
   const digits = minorUnitDigits(currency);
   const [whole, fraction = ''] = cleaned.split('.');
   if (fraction.length > digits) {
     const code = currency.toUpperCase();
-    return { error: digits === 0 ? `${code} amounts have no decimals.` : `${code} amounts have at most ${digits} decimals.` };
+    return { error: digits === 0 ? t('{code} amounts have no decimals.', { code }) : t('{code} amounts have at most {n} decimals.', { code, n: digits }) };
   }
   // Digit by digit, so a large amount never rounds through a double.
   const minor = Number(whole + fraction.padEnd(digits, '0'));
-  if (minor > MAX_MINOR) return { error: 'This amount is larger than the API accepts.' };
+  if (minor > MAX_MINOR) return { error: t('This amount is larger than the API accepts.') };
   return { minor };
 }
 

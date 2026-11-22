@@ -1,5 +1,7 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import BrandMark from './BrandMark.svelte';
+  import LanguageSwitcher from './LanguageSwitcher.svelte';
 
   /** @type {{ title: string, children: import('svelte').Snippet, footer: import('svelte').Snippet }} */
   let { title, children, footer } = $props();
@@ -9,15 +11,21 @@
   <div class="auth-card animate-in">
     <div class="auth-brand">
       <BrandMark size={36} />
-      <span>CRM</span>
+      <span>{t('CRM')}</span>
     </div>
     <h1 class="auth-title">{title}</h1>
     {@render children()}
     <p class="auth-footer">{@render footer()}</p>
+    <p class="auth-language"><LanguageSwitcher /></p>
   </div>
 </main>
 
 <style>
+  .auth-language {
+    margin-top: 16px;
+    text-align: center;
+  }
+
   .auth-page {
     min-height: 100vh;
     min-height: 100dvh;

@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
+import { t } from '../i18n';
 
 type Props = { backLabel?: string; backHref?: Href; actions?: ReactNode; children: ReactNode };
 
@@ -17,7 +18,7 @@ export function ScreenFrame({ backLabel, backHref, actions, children }: Props) {
           <View style={styles.header}>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel={`Back to ${backLabel}`}
+              accessibilityLabel={t('Back to {place}', { place: backLabel })}
               hitSlop={8}
               onPress={() => (router.canGoBack() ? router.back() : router.replace(backHref ?? '/'))}
             >

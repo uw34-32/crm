@@ -12,6 +12,7 @@ import { useRecord, useWorkspaceId } from '../../../../lib/records/hooks';
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
+import { t } from '../../../../i18n';
 
 const deals = dealsApi(session.api);
 
@@ -23,7 +24,7 @@ export default function EditDeal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (state.status === 'missing') return <NotFound title="Deal not found" backHref="/pipeline" backLabel="pipeline" />;
+  if (state.status === 'missing') return <NotFound title={t('Deal not found')} backHref="/pipeline" backLabel={t('pipeline')} />;
   const deal = state.record;
 
   async function save(draft: DealDraft) {
@@ -37,21 +38,21 @@ export default function EditDeal() {
       recordsChanged();
       router.back();
     } catch (err) {
-      setError(isMissing(err) ? 'This deal, or the chosen company, contact, or owner, no longer exists.' : err instanceof Error ? err.message : String(err));
+      setError(isMissing(err) ? t('This deal, or the chosen company, contact, or owner, no longer exists.') : err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <ScreenFrame backLabel="Deal" backHref={`/deals/${id}`}>
+    <ScreenFrame backLabel={t('Deal')} backHref={`/deals/${id}`}>
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        Edit deal
+        {t('Edit deal')}
       </Text>
       {state.status === 'error' ? (
         <ErrorNotice message={state.error} onRetry={() => void reload()} />
       ) : !deal || !workspaceId ? (
-        <ActivityIndicator accessibilityLabel="Loading the deal" />
+        <ActivityIndicator accessibilityLabel={t('Loading the deal')} />
       ) : (
         <DealForm
           workspaceId={workspaceId}
@@ -62,10 +63,10 @@ export default function EditDeal() {
             pipeline_id: deal.pipeline_id,
             expected_close_date: deal.expected_close_date,
             owner_id: deal.owner_id,
-            company: deal.company_id ? { id: deal.company_id, name: deal.company_name || 'Linked company' } : null,
-            contact: deal.contact_id ? { id: deal.contact_id, name: deal.contact_name || 'Linked contact' } : null
+            company: deal.company_id ? { id: deal.company_id, name: deal.company_name || t('Linked company') } : null,
+            contact: deal.contact_id ? { id: deal.contact_id, name: deal.contact_name || t('Linked contact') } : null
           }}
-          submitLabel="Save changes"
+          submitLabel={t('Save changes')}
           busy={busy}
           error={error}
           onSubmit={(d) => void save(d)}

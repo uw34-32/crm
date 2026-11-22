@@ -1,6 +1,8 @@
 // How a timeline reads: activities grouped by the local day they were created, the
 // state of a task against its due time, and who may change an activity.
 
+import { t } from '../../i18n';
+
 export type Activity = {
   id: string;
   kind: 'note' | 'call' | 'meeting' | 'task';
@@ -27,8 +29,8 @@ const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
 /** Today, Yesterday, or the day; the year only when it is not this one. */
 export function dayLabel(date: Date, now: Date, locale?: string) {
   const days = Math.round((startOfDay(now).getTime() - startOfDay(date).getTime()) / DAY_MS);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
+  if (days === 0) return t('Today');
+  if (days === 1) return t('Yesterday');
   const sameYear = date.getFullYear() === now.getFullYear();
   return new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).format(date);
 }
@@ -76,6 +78,6 @@ export function canEditActivity(activity: Activity, { userId, role }: { userId: 
  */
 export function memberName(members: { user_id: string; name?: string; email: string }[], userId: string | null | undefined) {
   const member = userId ? members.find((m) => m.user_id === userId) : undefined;
-  if (!member) return 'Former member';
+  if (!member) return t('Former member');
   return member.name?.trim() || member.email;
 }

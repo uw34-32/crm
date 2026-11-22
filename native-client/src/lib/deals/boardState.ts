@@ -6,6 +6,7 @@ import { toSentence } from '../forms';
 import { createStore } from '../store';
 import { isMissing } from '../records/load';
 import { appendDeals, buildColumns, planMove, removeDeal, replaceDeal, undoMove, type Column, type Deal, type Stage } from './board';
+import { t } from '../../i18n';
 
 export type ClosedKind = 'won' | 'lost';
 type Paging = { offset: number; hasMore: boolean; loading: boolean; error: string };
@@ -175,7 +176,7 @@ export function createBoard({ pipelines, deals }: Deps) {
       }
     } catch (err) {
       if (mine !== generation) return;
-      store.set({ columns: undoMove(store.get().columns, dealId, plan.from), notice: `The move was undone. ${toSentence(messageOf(err))}` });
+      store.set({ columns: undoMove(store.get().columns, dealId, plan.from), notice: `${t('The move was undone.')} ${toSentence(messageOf(err))}` });
       const pipeline = store.get().pipeline;
       if (isMissing(err) && pipeline) void load(workspaceId, pipeline.id);
     } finally {

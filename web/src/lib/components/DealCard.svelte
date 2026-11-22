@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   // One deal on the board: title, value, who it is with, and its owner. The card drags
   // with the mouse, and its Move button opens a dialog for the keyboard and for touch,
   // where there is no drag.
@@ -47,7 +48,7 @@
       <p class="deal-owner">{ownerName}</p>
     {/if}
   </div>
-  <button type="button" class="icon-btn move" onclick={onmove} disabled={busy} aria-label="Move {deal.title}" title="Move">
+  <button type="button" class="icon-btn move" onclick={onmove} disabled={busy} aria-label={t('Move {name}', { name: deal.title })} title={t('Move')}>
     <ArrowRightLeft size={16} aria-hidden="true" />
   </button>
 </article>

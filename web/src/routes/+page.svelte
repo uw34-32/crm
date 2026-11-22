@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { session } from '$lib/session.svelte.js';
 
@@ -7,4 +8,4 @@
   });
 </script>
 
-<h1 class="sr-only">CRM</h1>
+<h1 class="sr-only">{t('CRM')}</h1>

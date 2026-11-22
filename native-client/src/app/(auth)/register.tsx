@@ -8,6 +8,7 @@ import { Field, type TextInputHandle } from '../../components/Field';
 import { checkEmail, checkName, checkPassword, toSentence } from '../../lib/forms';
 import { session } from '../../services';
 import { useTheme } from '../../theme';
+import { t } from '../../i18n';
 
 export default function Register() {
   const theme = useTheme();
@@ -23,7 +24,7 @@ export default function Register() {
   async function submit() {
     setFormError('');
     const next = {
-      name: checkName(name, 'Enter your name.'),
+      name: checkName(name, t('Enter your name.')),
       email: checkEmail(email),
       password: checkPassword(password, { creating: true })
     };
@@ -40,16 +41,16 @@ export default function Register() {
 
   return (
     <AuthScreen
-      title="Create an account"
+      title={t('Create an account')}
       footer={
         <Text style={{ color: theme.text2 }}>
-          Have an account? <Link href="/login" style={{ color: theme.accentText }}>Sign in</Link>
+          {t('Already have an account?')} <Link href="/login" style={{ color: theme.accentText }}>{t('Sign in')}</Link>
         </Text>
       }
     >
       {formError ? <ErrorNotice message={formError} /> : null}
       <Field
-        label="Name"
+        label={t('Name')}
         value={name}
         onChangeText={setName}
         error={errors.name}
@@ -60,7 +61,7 @@ export default function Register() {
       />
       <Field
         ref={emailInput}
-        label="Email"
+        label={t('Email')}
         value={email}
         onChangeText={setEmail}
         error={errors.email}
@@ -73,7 +74,7 @@ export default function Register() {
       />
       <Field
         ref={passwordInput}
-        label="Password"
+        label={t('Password')}
         value={password}
         onChangeText={setPassword}
         error={errors.password}
@@ -83,7 +84,7 @@ export default function Register() {
         returnKeyType="go"
         onSubmitEditing={() => void submit()}
       />
-      <Button label={busy ? 'Creating account…' : 'Create account'} busy={busy} onPress={() => void submit()} />
+      <Button label={busy ? t('Creating account…') : t('Create account')} busy={busy} onPress={() => void submit()} />
     </AuthScreen>
   );
 }

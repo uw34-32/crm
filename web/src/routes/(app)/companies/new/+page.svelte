@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import CompanyForm from '$lib/components/CompanyForm.svelte';
   import { recordsApi } from '$lib/api/records.js';
@@ -20,7 +21,7 @@
     formError = '';
     try {
       const company = /** @type {{ id: string, name: string }} */ (await companies.create(workspaceId, companyCreateBody(draft)));
-      showToast(`Added ${company.name}`);
+      showToast(t('Added {name}', { name: company.name }));
       await goto(`/companies/${company.id}`, { replaceState: true });
     } catch (err) {
       formError = toSentence(err instanceof Error ? err.message : String(err));
@@ -31,11 +32,11 @@
 </script>
 
 <svelte:head>
-  <title>New company · CRM</title>
+  <title>{t('New company · CRM')}</title>
 </svelte:head>
 
 <div class="animate-in">
-  <h1 class="page-title">New company</h1>
-  <p class="page-lede">Only the name is required.</p>
-  <CompanyForm submitLabel="Add company" busyLabel="Adding…" {busy} {formError} cancelHref={listHref('companies')} onsubmit={create} />
+  <h1 class="page-title">{t('New company')}</h1>
+  <p class="page-lede">{t('Only the name is required.')}</p>
+  <CompanyForm submitLabel={t('Add company')} busyLabel={t('Adding…')} {busy} {formError} cancelHref={listHref('companies')} onsubmit={create} />
 </div>

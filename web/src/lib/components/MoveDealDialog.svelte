@@ -1,4 +1,5 @@
 <script>
+  import { nameOf, t } from '$lib/i18n.svelte.js';
   // Moves a deal without dragging: pick a stage and a place in it. When the stage is
   // a lost one, the reason is asked here too. A drop into a lost stage opens the same
   // dialog with the place already set, so only the reason is asked.
@@ -61,11 +62,11 @@
     const reason = lostReason.trim();
     if (askReason) {
       if (!reason) {
-        reasonError = 'Say why the deal was lost.';
+        reasonError = t('Say why the deal was lost.');
         return;
       }
       if ([...reason].length > DEAL_LIMITS.lost_reason) {
-        reasonError = `Use at most ${DEAL_LIMITS.lost_reason} characters.`;
+        reasonError = t('Use at most {n} characters.', { n: DEAL_LIMITS.lost_reason });
         return;
       }
     }
@@ -77,33 +78,33 @@
 
 <dialog bind:this={dialog} class="modal" aria-labelledby="move-title" oncancel={(event) => { event.preventDefault(); cancel(); }}>
   <form method="dialog" novalidate onsubmit={submit}>
-    <h2 class="modal-title" id="move-title">{preset && askReason ? `Mark ${deal.title} as lost` : `Move ${deal.title}`}</h2>
+    <h2 class="modal-title" id="move-title">{preset && askReason ? t('Mark {name} as lost', { name: deal.title }) : t('Move {name}', { name: deal.title })}</h2>
     {#if !preset}
       <div class="form-group">
-        <label class="form-label" for="move-stage">Stage</label>
+        <label class="form-label" for="move-stage">{t('Stage')}</label>
         <select id="move-stage" class="select" bind:value={stageId} onchange={onStageChange}>
           {#each columns as column (column.stage.id)}
-            <option value={column.stage.id}>{column.stage.name}{column.stage.id === deal.stage_id ? ' (current)' : ''}</option>
+            <option value={column.stage.id}>{nameOf(column.stage.name)}{column.stage.id === deal.stage_id ? ` ${t('(current)')}` : ''}</option>
           {/each}
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label" for="move-position">Place in {target?.stage.name ?? 'the stage'}</label>
+        <label class="form-label" for="move-position">{t('Place in {stage}', { stage: target ? nameOf(target.stage.name) : t('the stage') })}</label>
         <select id="move-position" class="select" bind:value={index} disabled={target?.hasMore && index === others.length}>
           {#each { length: others.length + 1 } as _, i (i)}
-            <option value={i}>{i + 1} of {others.length + 1}{i === others.length ? ' (last)' : ''}</option>
+            <option value={i}>{t('{n} of {total}', { n: i + 1, total: others.length + 1 })}{i === others.length ? ` (${t('last')})` : ''}</option>
           {/each}
         </select>
         {#if target?.hasMore}
-          <p class="form-hint">Not every deal of this stage is loaded; last means after all of them.</p>
+          <p class="form-hint">{t('Not every deal of this stage is loaded; last means after all of them.')}</p>
         {/if}
       </div>
     {:else}
-      <p class="modal-text">The deal moves to {target?.stage.name ?? 'the stage'}.</p>
+      <p class="modal-text">{t('The deal moves to {stage}.', { stage: target ? nameOf(target.stage.name) : t('the stage') })}</p>
     {/if}
     {#if askReason}
       <div class="form-group">
-        <label class="form-label" for="move-reason">Why was it lost?</label>
+        <label class="form-label" for="move-reason">{t('Why was it lost?')}</label>
         <textarea
           id="move-reason"
           class="input"
@@ -119,7 +120,7 @@
       </div>
     {/if}
     <div class="modal-actions">
-      <button type="button" class="btn btn-secondary" onclick={cancel}>Cancel</button>
+      <button type="button" class="btn btn-secondary" onclick={cancel}>{t('Cancel')}</button>
       <button type="submit" class="btn btn-primary">{askReason ? 'Mark as lost' : 'Move deal'}</button>
     </div>
   </form>

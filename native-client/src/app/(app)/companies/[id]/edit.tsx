@@ -12,6 +12,7 @@ import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/ho
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
+import { t } from '../../../../i18n';
 
 const companies = recordsApi(session.api, 'companies');
 
@@ -23,7 +24,7 @@ export default function EditCompany() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (state.status === 'missing') return <NotFound title="Company not found" backHref="/companies" backLabel="companies" />;
+  if (state.status === 'missing') return <NotFound title={t('Company not found')} backHref="/companies" backLabel={t('companies')} />;
   const company = state.record;
 
   async function save(draft: CompanyDraft) {
@@ -37,25 +38,25 @@ export default function EditCompany() {
       recordsChanged();
       router.back();
     } catch (err) {
-      setError(isMissing(err) ? 'This company no longer exists. Go back and check the list.' : err instanceof Error ? err.message : String(err));
+      setError(isMissing(err) ? t('This company no longer exists. Go back and check the list.') : err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <ScreenFrame backLabel="Company" backHref={`/companies/${id}`}>
+    <ScreenFrame backLabel={t('Company')} backHref={`/companies/${id}`}>
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        Edit company
+        {t('Edit company')}
       </Text>
       {state.status === 'error' ? (
         <ErrorNotice message={state.error} onRetry={() => void reload()} />
       ) : !company ? (
-        <ActivityIndicator accessibilityLabel="Loading the company" />
+        <ActivityIndicator accessibilityLabel={t('Loading the company')} />
       ) : (
         <CompanyForm
           initial={{ name: company.name, domain: company.domain ?? '', phone: company.phone ?? '', industry: company.industry ?? '', address: company.address ?? '' }}
-          submitLabel="Save changes"
+          submitLabel={t('Save changes')}
           busy={busy}
           error={error}
           onSubmit={(d) => void save(d)}

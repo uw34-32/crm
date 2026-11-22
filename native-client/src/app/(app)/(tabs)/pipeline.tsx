@@ -16,6 +16,7 @@ import { changes } from '../../../lib/records/changes';
 import { useStore } from '../../../lib/store';
 import { session } from '../../../services';
 import { radius, useTheme } from '../../../theme';
+import { nameOf, t } from '../../../i18n';
 
 const board = createBoard({ pipelines: pipelinesApi(session.api), deals: dealsApi(session.api) });
 
@@ -47,20 +48,20 @@ export default function Pipeline() {
   const header = (
     <View style={styles.header}>
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        Pipeline
+        {t('Pipeline')}
       </Text>
       {state.pipelines.length > 1 ? (
         <OptionChips
-          label="Pipeline"
+          label={t('Pipeline')}
           value={state.pipeline?.id ?? ''}
-          options={state.pipelines.map((p) => ({ value: p.id, label: p.name }))}
+          options={state.pipelines.map((p) => ({ value: p.id, label: nameOf(p.name) }))}
           onChange={(id) => {
             setStageId('');
             if (workspaceId) void board.load(workspaceId, id);
           }}
         />
       ) : null}
-      <Button label="New deal" onPress={() => router.push(state.pipeline ? `/deals/new?pipeline=${state.pipeline.id}` : '/deals/new')} />
+      <Button label={t('New deal')} onPress={() => router.push(state.pipeline ? `/deals/new?pipeline=${state.pipeline.id}` : '/deals/new')} />
       {state.status === 'ready' && columns.length > 0 ? (
         <View style={styles.stages} accessibilityRole="tablist">
           {columns.map((c) => {
@@ -75,7 +76,7 @@ export default function Pipeline() {
                 style={[styles.stage, { backgroundColor: selected ? theme.accentStrong : theme.surface, borderColor: selected ? theme.accentStrong : theme.border }]}
               >
                 <Text style={{ color: selected ? '#fff' : theme.text, fontWeight: '600' }}>
-                  {c.stage.name} · {c.deals.length}
+                  {nameOf(c.stage.name)} · {c.deals.length}
                   {c.hasMore ? '+' : ''}
                 </Text>
                 {totals[0] ? (
@@ -90,21 +91,21 @@ export default function Pipeline() {
         </View>
       ) : null}
       {state.notice ? <ErrorNotice message={state.notice} /> : null}
-      {state.truncated ? <Text style={{ color: theme.text2 }}>Only the first open deals are shown.</Text> : null}
+      {state.truncated ? <Text style={{ color: theme.text2 }}>{t('Only the first open deals are shown.')}</Text> : null}
     </View>
   );
 
   let empty = null;
   if (state.status === 'error') empty = <ErrorNotice message={state.error} onRetry={() => workspaceId && void board.load(workspaceId, state.pipeline?.id ?? '')} />;
-  else if (state.status === 'loading') empty = <ActivityIndicator accessibilityLabel="Loading the pipeline" style={{ marginVertical: 24 }} />;
-  else if (!state.pipeline) empty = <Text style={{ color: theme.text2, padding: 24, textAlign: 'center' }}>This workspace has no pipeline yet.</Text>;
-  else if (column && column.deals.length === 0) empty = <Text style={{ color: theme.text2, padding: 24, textAlign: 'center' }}>No deals in {column.stage.name}.</Text>;
+  else if (state.status === 'loading') empty = <ActivityIndicator accessibilityLabel={t('Loading the pipeline')} style={{ marginVertical: 24 }} />;
+  else if (!state.pipeline) empty = <Text style={{ color: theme.text2, padding: 24, textAlign: 'center' }}>{t('This workspace has no pipeline yet.')}</Text>;
+  else if (column && column.deals.length === 0) empty = <Text style={{ color: theme.text2, padding: 24, textAlign: 'center' }}>{t('No deals in {name}.', { name: nameOf(column.stage.name) })}</Text>;
 
   const footer =
     closedKind && paging?.hasMore ? (
       <View style={{ gap: 8 }}>
         {paging.error ? <ErrorNotice message={paging.error} /> : null}
-        <Button label={paging.loading ? 'Loading…' : `Show more ${closedKind} deals`} variant="secondary" busy={paging.loading} onPress={() => void board.loadMore(closedKind)} />
+        <Button label={paging.loading ? t('Loading…') : closedKind === 'won' ? t('Show more won deals') : t('Show more lost deals')} variant="secondary" busy={paging.loading} onPress={() => void board.loadMore(closedKind)} />
       </View>
     ) : null;
 

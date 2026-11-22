@@ -8,6 +8,8 @@
  * @typedef {{ deal_id: string } | { contact_id: string } | { company_id: string }} ActivityLink
  */
 
+import { t } from '../i18n.svelte.js';
+
 export const ACTIVITY_KINDS = /** @type {const} */ (['note', 'call', 'meeting', 'task']);
 export const ACTIVITY_LIMITS = { subject: 200, body: 10000 };
 
@@ -19,7 +21,7 @@ const LOCAL_INPUT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
 /** @param {string} value @param {number} max */
-const tooLong = (value, max) => ([...value].length > max ? `Use at most ${max} characters.` : '');
+const tooLong = (value, max) => ([...value].length > max ? t('Use at most {n} characters.', { n: max }) : '');
 
 /** An instant as the local value a datetime-local field holds, to the minute. @param {string | null | undefined} iso */
 export function toLocalInput(iso) {
@@ -42,9 +44,9 @@ export function fromLocalInput(value) {
 function checkDue(value) {
   if (!value) return '';
   const iso = fromLocalInput(value);
-  if (!iso) return 'Enter a date and time.';
+  if (!iso) return t('Enter a date and time.');
   const year = new Date(iso).getUTCFullYear();
-  return year < MIN_YEAR || year > MAX_YEAR ? 'Use a date from 1900 to 2200.' : '';
+  return year < MIN_YEAR || year > MAX_YEAR ? t('Use a date from 1900 to 2200.') : '';
 }
 
 /** @param {Record<string, string>} errors */
@@ -54,7 +56,7 @@ const compact = (errors) => Object.fromEntries(Object.entries(errors).filter(([,
 export function validateActivity(draft) {
   const subject = text(draft.subject);
   return compact({
-    subject: subject ? tooLong(subject, ACTIVITY_LIMITS.subject) : 'Enter a subject.',
+    subject: subject ? tooLong(subject, ACTIVITY_LIMITS.subject) : t('Enter a subject.'),
     body: tooLong(text(draft.body), ACTIVITY_LIMITS.body),
     due_at: draft.kind === 'task' ? checkDue(text(draft.due_at)) : ''
   });

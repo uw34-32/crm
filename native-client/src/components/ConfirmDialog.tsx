@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, useTheme } from '../theme';
 import { Button } from './Button';
 import { ErrorNotice } from './ErrorNotice';
+import { t } from '../i18n';
 
 type Props = {
   visible: boolean;
@@ -20,7 +21,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, busy = fa
   const theme = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable accessibilityLabel="Close dialog" style={styles.backdrop} onPress={busy ? undefined : onCancel}>
+      <Pressable accessibilityLabel={t('Close dialog')} style={styles.backdrop} onPress={busy ? undefined : onCancel}>
         <Pressable accessibilityViewIsModal style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={() => {}}>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
             {title}
@@ -28,7 +29,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, busy = fa
           <Text style={{ color: theme.text2, fontSize: 15 }}>{message}</Text>
           {error ? <ErrorNotice message={error} /> : null}
           <View style={styles.actions}>
-            <Button label="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
+            <Button label={t('Cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
             <Button label={confirmLabel} variant="danger" busy={busy} onPress={onConfirm} />
           </View>
         </Pressable>

@@ -21,10 +21,11 @@ import { isMissing } from '../../../../lib/records/load';
 import { isPersonOf, loadPeople } from '../../../../lib/records/people';
 import { session } from '../../../../services';
 import { radius, useTheme } from '../../../../theme';
+import { dateLocale, t } from '../../../../i18n';
 
 const companies = recordsApi(session.api, 'companies');
 const contactsApi = recordsApi(session.api, 'contacts');
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function CompanyDetail() {
   const theme = useTheme();
@@ -62,7 +63,7 @@ export default function CompanyDetail() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  if (state.status === 'missing') return <NotFound title="Company not found" backHref="/companies" backLabel="companies" />;
+  if (state.status === 'missing') return <NotFound title={t('Company not found')} backHref="/companies" backLabel={t('companies')} />;
 
   async function remove() {
     if (!company || !workspaceId) return;
@@ -84,17 +85,17 @@ export default function CompanyDetail() {
     recordsChanged();
   }
 
-  const details = company ? ([['Domain', company.domain], ['Phone', company.phone], ['Industry', company.industry], ['Address', company.address]] as const).filter(([, value]) => value) : [];
+  const details = company ? ([[t('Domain'), company.domain], [t('Phone'), company.phone], [t('Industry'), company.industry], [t('Address'), company.address]] as const).filter(([, value]) => value) : [];
 
   return (
     <ScreenFrame
-      backLabel="Companies"
+      backLabel={t('Companies')}
       backHref="/companies"
       actions={
         company ? (
           <>
-            <TextAction label="Edit" onPress={() => router.push(`/companies/${company.id}/edit`)} />
-            <TextAction label="Delete" danger onPress={() => setConfirming(true)} />
+            <TextAction label={t('Edit')} onPress={() => router.push(`/companies/${company.id}/edit`)} />
+            <TextAction label={t('Delete')} danger onPress={() => setConfirming(true)} />
           </>
         ) : null
       }
@@ -102,12 +103,12 @@ export default function CompanyDetail() {
       {state.status === 'error' ? (
         <>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-            Company
+            {t('Company')}
           </Text>
           <ErrorNotice message={state.error} onRetry={() => void reload()} />
         </>
       ) : !company ? (
-        <ActivityIndicator accessibilityLabel="Loading the company" />
+        <ActivityIndicator accessibilityLabel={t('Loading the company')} />
       ) : (
         <>
           <View style={styles.hero}>
@@ -119,27 +120,27 @@ export default function CompanyDetail() {
               {company.industry ? <Text style={{ color: theme.text2, fontSize: 16 }}>{company.industry}</Text> : null}
             </View>
           </View>
-          <DetailCard title="Details">
+          <DetailCard title={t('Details')}>
             {details.length > 0 ? (
               details.map(([label, value]) => (
                 <DetailRow
                   key={label}
                   label={label}
                   value={value as string}
-                  url={label === 'Phone' ? `tel:${value}` : label === 'Domain' ? `https://${value}` : undefined}
+                  url={label === t('Phone') ? `tel:${value}` : label === t('Domain') ? `https://${value}` : undefined}
                 />
               ))
             ) : (
-              <Text style={{ color: theme.text2 }}>No domain, phone, industry, or address yet.</Text>
+              <Text style={{ color: theme.text2 }}>{t('No domain, phone, industry, or address yet.')}</Text>
             )}
           </DetailCard>
-          <DetailCard title="People">
+          <DetailCard title={t('People')}>
             {people.status === 'error' ? (
               <ErrorNotice message={people.error} onRetry={() => company && pager.current && void loadPeople(pager.current, store, company.name)} />
             ) : people.status !== 'ready' ? (
-              <ActivityIndicator accessibilityLabel="Loading people" />
+              <ActivityIndicator accessibilityLabel={t('Loading people')} />
             ) : people.items.length === 0 ? (
-              <Text style={{ color: theme.text2 }}>{people.hasMore ? 'None found in the first results. Look further to check more.' : 'No one is linked to this company yet.'}</Text>
+              <Text style={{ color: theme.text2 }}>{people.hasMore ? t('None found in the first results. Look further to check more.') : t('No one is linked to this company yet.')}</Text>
             ) : (
               people.items.map((person) => (
                 <Pressable
@@ -157,22 +158,22 @@ export default function CompanyDetail() {
               ))
             )}
             {people.status === 'ready' && people.hasMore ? (
-              <Button label={people.loadingMore ? 'Looking…' : 'Look further'} variant="secondary" busy={people.loadingMore} onPress={() => void pager.current?.more()} />
+              <Button label={people.loadingMore ? t('Looking…') : t('Look further')} variant="secondary" busy={people.loadingMore} onPress={() => void pager.current?.more()} />
             ) : null}
             {people.moreError ? <ErrorNotice message={people.moreError} onRetry={() => void pager.current?.more()} /> : null}
-            <Button label="Add a person" variant="secondary" onPress={() => router.push(`/contacts/new?company=${company.id}`)} />
+            <Button label={t('Add a person')} variant="secondary" onPress={() => router.push(`/contacts/new?company=${company.id}`)} />
           </DetailCard>
           {workspaceId ? <ActivityTimeline workspaceId={workspaceId} link={{ company_id: company.id }} /> : null}
           <Text style={{ color: theme.text2, fontSize: 13 }}>
-            Added {date.format(new Date(company.created_at))} · Updated {date.format(new Date(company.updated_at))}
+            {t('Added {date}', { date: formatDate(new Date(company.created_at)) })} · {t('Updated {date}', { date: formatDate(new Date(company.updated_at)) })}
           </Text>
         </>
       )}
       <ConfirmDialog
         visible={confirming}
-        title={`Delete ${company?.name ?? 'this company'}?`}
-        message="The people linked to it stay in your contacts and lose the link. Deals keep their history without the company."
-        confirmLabel="Delete company"
+        title={t('Delete {name}?', { name: company?.name ?? t('this company') })}
+        message={t('The people linked to it stay in your contacts and lose the link. Deals keep their history without the company.')}
+        confirmLabel={t('Delete company')}
         busy={deleting}
         error={deleteError}
         onConfirm={() => void remove()}

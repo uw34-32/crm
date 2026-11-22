@@ -1,9 +1,10 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { page } from '$app/state';
 </script>
 
 <svelte:head>
-  <title>{page.status === 404 ? 'Page not found' : 'Error'} · CRM</title>
+  <title>{page.status === 404 ? t('Page not found') : t('Error')} · CRM</title>
 </svelte:head>
 
 <main class="error-page">
@@ -12,7 +13,7 @@
     <p class="error-message">
       {page.status === 404 ? 'Check the address, or go back to the dashboard.' : page.error?.message || 'Try again in a moment.'}
     </p>
-    <a href="/dashboard" class="btn btn-primary">Go to the dashboard</a>
+    <a href="/dashboard" class="btn btn-primary">{t('Go to the dashboard')}</a>
   </div>
 </main>
 

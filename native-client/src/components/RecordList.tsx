@@ -11,6 +11,7 @@ import { Button } from './Button';
 import { ErrorNotice } from './ErrorNotice';
 import { RecordAvatar } from './RecordAvatar';
 import { SearchField } from './SearchField';
+import { t } from '../i18n';
 
 export type Row = { name: string; subtitle: string; href: Href };
 
@@ -34,25 +35,25 @@ export function RecordList<T extends { id: string }>({ title, noun, newLabel, ne
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
         {title}
       </Text>
-      <SearchField value={search} onChangeText={setSearch} placeholder={`Search ${noun}`} />
+      <SearchField value={search} onChangeText={setSearch} placeholder={t('Search {noun}', { noun: t(noun) })} />
       <Button label={newLabel} onPress={() => router.push(newHref)} />
     </View>
   );
 
   let empty = null;
   if (state.status === 'error') empty = <ErrorNotice message={state.error} onRetry={retry} />;
-  else if (state.status !== 'ready') empty = <ActivityIndicator accessibilityLabel={`Loading ${noun}`} style={styles.spinner} />;
+  else if (state.status !== 'ready') empty = <ActivityIndicator accessibilityLabel={t('Loading {noun}', { noun: t(noun) })} style={styles.spinner} />;
   else if (state.items.length === 0)
     empty = (
       <Text style={{ color: theme.text2, textAlign: 'center', padding: 24 }}>
-        {searching ? `No ${noun} match “${state.q}”.` : `No ${noun} yet. Add the first one.`}
+        {searching ? t('No {noun} match “{q}”.', { noun: t(noun), q: state.q }) : t('No {noun} yet. Add the first one.', { noun: t(noun) })}
       </Text>
     );
 
   const footer = state.moreError ? (
     <ErrorNotice message={state.moreError} onRetry={more} />
   ) : state.loadingMore ? (
-    <ActivityIndicator accessibilityLabel={`Loading more ${noun}`} style={styles.spinner} />
+    <ActivityIndicator accessibilityLabel={t('Loading more {noun}', { noun: t(noun) })} style={styles.spinner} />
   ) : null;
 
   return (

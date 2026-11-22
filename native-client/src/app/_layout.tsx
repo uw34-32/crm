@@ -8,13 +8,18 @@ import { ErrorNotice } from '../components/ErrorNotice';
 import { useStore } from '../lib/store';
 import { session } from '../services';
 import { useTheme } from '../theme';
+import { startLocale, t, useLocale } from '../i18n';
 
 export default function RootLayout() {
   const theme = useTheme();
   const { user, ready, restoreError } = useStore(session.state);
 
-  // Trade the saved refresh token for a session once, when the app starts.
+  // The language shapes every screen, so a change of it remounts them.
+  const locale = useLocale();
+
+  // Trade the saved refresh token for a session once, when the app starts, and read the language.
   useEffect(() => {
+    void startLocale();
     void session.restore();
   }, []);
 
@@ -25,10 +30,10 @@ export default function RootLayout() {
           {restoreError ? (
             <View style={{ gap: 12 }}>
               <ErrorNotice message={restoreError} onRetry={() => void session.restore()} />
-              <Button label="Sign out" variant="secondary" onPress={() => void session.signOut()} />
+              <Button label={t('Sign out')} variant="secondary" onPress={() => void session.signOut()} />
             </View>
           ) : (
-            <ActivityIndicator accessibilityLabel="Restoring your session" />
+            <ActivityIndicator accessibilityLabel={t('Restoring your session')} />
           )}
         </View>
       </SafeAreaProvider>
@@ -39,7 +44,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack key={locale} screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!user}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>

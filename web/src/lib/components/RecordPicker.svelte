@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   // Picks a company or a contact by searching the workspace's records. The text is only
   // for searching: a record is linked by choosing it from the list, and unlinked with
   // the remove button or by clearing the field. Leaving the field with unmatched text
@@ -12,7 +13,7 @@
 
   /** @typedef {{ id: string, name: string, detail?: string }} Choice */
   /** @type {{ id: string, kind?: 'companies' | 'contacts', label?: string, workspaceId: string, value: Choice | null, error?: string }} */
-  let { id, kind = 'companies', label = kind === 'contacts' ? 'Contact' : 'Company', workspaceId, value = $bindable(null), error = '' } = $props();
+  let { id, kind = 'companies', label = '', workspaceId, value = $bindable(null), error = '' } = $props();
 
   // The kind is fixed for the life of a picker.
   const records = untrack(() => recordsApi(api, kind));
@@ -115,18 +116,18 @@
 
   let message = $derived(
     status === 'loading'
-      ? `Searching ${noun}…`
+      ? t('Searching {noun}…', { noun: t(noun) })
       : status === 'error'
-        ? `The ${noun} could not be loaded. Keep typing to try again.`
+        ? t('The {noun} could not be loaded. Keep typing to try again.', { noun: t(noun) })
         : status === 'ready' && options.length === 0
-          ? `No ${noun} match. Add one first, then link it here.`
+          ? t('No {noun} match. Add one first, then link it here.', { noun: t(noun) })
           : ''
   );
   let describedBy = $derived([hintId, error && `${id}-error`].filter(Boolean).join(' '));
 </script>
 
 <div class="form-group picker">
-  <label class="form-label" for={id}>{label}</label>
+  <label class="form-label" for={id}>{label || (kind === 'contacts' ? t('Contact') : t('Company'))}</label>
   <div class="picker-field">
     <input
       bind:this={input}
@@ -142,7 +143,7 @@
       aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined}
       aria-describedby={describedBy}
       aria-invalid={error ? 'true' : undefined}
-      placeholder="Search {noun}"
+      placeholder={t('Search {noun}', { noun: t(noun) })}
       bind:value={query}
       onfocus={openList}
       {oninput}
@@ -150,12 +151,12 @@
       {onkeydown}
     />
     {#if value}
-      <button type="button" class="icon-btn unlink" onclick={unlink} aria-label="Remove the link to {value.name}" title="Remove the link">
+      <button type="button" class="icon-btn unlink" onclick={unlink} aria-label={t('Remove the link to {name}', { name: value.name })} title={t('Remove the link')}>
         <X size={18} aria-hidden="true" />
       </button>
     {/if}
   </div>
-  <ul class="picker-list" id={listId} role="listbox" aria-label={noun} hidden={!open || options.length === 0}>
+  <ul class="picker-list" id={listId} role="listbox" aria-label={t(noun)} hidden={!open || options.length === 0}>
     {#each options as option, i (option.id)}
       <li
         id="{id}-option-{i}"
@@ -174,7 +175,7 @@
     {/each}
   </ul>
   <p class="form-hint" id={hintId}>
-    {value ? `Linked to ${value.name}.` : `No ${kind === 'contacts' ? 'contact' : 'company'} chosen.`}
+    {value ? t('Linked to {name}.', { name: value.name }) : kind === 'contacts' ? t('No contact chosen.') : t('No company chosen.')}
   </p>
   <p class="sr-only" id={statusId} role="status">{open ? message : ''}</p>
   {#if open && message && status !== 'loading'}

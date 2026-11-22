@@ -11,6 +11,7 @@ import { useWorkspaceId } from '../../../lib/records/hooks';
 import { isMissing } from '../../../lib/records/load';
 import { session } from '../../../services';
 import { useTheme } from '../../../theme';
+import { t } from '../../../i18n';
 
 const deals = dealsApi(session.api);
 const pipelines = pipelinesApi(session.api);
@@ -48,23 +49,23 @@ export default function NewDeal() {
       recordsChanged();
       router.replace(`/deals/${deal.id}`);
     } catch (err) {
-      setError(isMissing(err) ? 'The pipeline, stage, company, contact, or owner no longer exists. Choose another one.' : err instanceof Error ? err.message : String(err));
+      setError(isMissing(err) ? t('The pipeline, stage, company, contact, or owner no longer exists. Choose another one.') : err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <ScreenFrame backLabel="Pipeline" backHref="/pipeline">
+    <ScreenFrame backLabel={t('Pipeline')} backHref="/pipeline">
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        New deal
+        {t('New deal')}
       </Text>
       {loadError ? (
         <ErrorNotice message={loadError} onRetry={() => setAttempt((n) => n + 1)} />
       ) : !choices || !workspaceId ? (
-        <ActivityIndicator accessibilityLabel="Loading the pipelines" />
+        <ActivityIndicator accessibilityLabel={t('Loading the pipelines')} />
       ) : (
-        <DealForm workspaceId={workspaceId} pipelines={choices} creating submitLabel="Add deal" busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
+        <DealForm workspaceId={workspaceId} pipelines={choices} creating submitLabel={t('Add deal')} busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
       )}
     </ScreenFrame>
   );

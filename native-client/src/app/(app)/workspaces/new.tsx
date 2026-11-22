@@ -9,6 +9,7 @@ import { checkName, toSentence } from '../../../lib/forms';
 import { useStore } from '../../../lib/store';
 import { workspaces } from '../../../services';
 import { useTheme } from '../../../theme';
+import { t } from '../../../i18n';
 
 export default function NewWorkspace() {
   const theme = useTheme();
@@ -20,7 +21,7 @@ export default function NewWorkspace() {
 
   async function submit() {
     setFormError('');
-    const problem = checkName(name, 'Enter a name for the workspace.');
+    const problem = checkName(name, t('Enter a name for the workspace.'));
     setError(problem);
     if (problem) return;
     setBusy(true);
@@ -38,13 +39,13 @@ export default function NewWorkspace() {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-          New workspace
+          {t('New workspace')}
         </Text>
-        {list.length === 0 ? <Text style={{ color: theme.text2 }}>You are not in a workspace yet. Create one to start.</Text> : null}
+        {list.length === 0 ? <Text style={{ color: theme.text2 }}>{t('You are not in a workspace yet. Create one to start.')}</Text> : null}
         {formError ? <ErrorNotice message={formError} /> : null}
-        <Field label="Name" value={name} onChangeText={setName} error={error} returnKeyType="go" onSubmitEditing={() => void submit()} />
-        <Button label={busy ? 'Creating…' : 'Create workspace'} busy={busy} onPress={() => void submit()} />
-        {list.length > 0 ? <Button label="Cancel" variant="secondary" onPress={() => router.back()} /> : null}
+        <Field label={t('Name')} value={name} onChangeText={setName} error={error} returnKeyType="go" onSubmitEditing={() => void submit()} />
+        <Button label={busy ? t('Creating…') : t('Create workspace')} busy={busy} onPress={() => void submit()} />
+        {list.length > 0 ? <Button label={t('Cancel')} variant="secondary" onPress={() => router.back()} /> : null}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -38,11 +39,11 @@
     formError = '';
     try {
       const deal = /** @type {{ id: string, title: string }} */ (await deals.create(workspaceId, dealCreateBody(draft)));
-      showToast(`Added ${deal.title}`);
+      showToast(t('Added {name}', { name: deal.title }));
       await goto(`/deals/${deal.id}`, { replaceState: true });
     } catch (err) {
       formError = isMissing(err)
-        ? 'The pipeline, stage, company, contact, or owner no longer exists. Choose another one.'
+        ? t('The pipeline, stage, company, contact, or owner no longer exists. Choose another one.')
         : toSentence(err instanceof Error ? err.message : String(err));
     } finally {
       busy = false;
@@ -51,19 +52,19 @@
 </script>
 
 <svelte:head>
-  <title>New deal · CRM</title>
+  <title>{t('New deal · CRM')}</title>
 </svelte:head>
 
 <div class="animate-in">
-  <h1 class="page-title">New deal</h1>
-  <p class="page-lede">A title and a currency are enough to start. The deal goes to the end of its first stage.</p>
+  <h1 class="page-title">{t('New deal')}</h1>
+  <p class="page-lede">{t('A title and a currency are enough to start. The deal goes to the end of its first stage.')}</p>
   {#await pipelines}
     <div aria-busy="true">
-      <p class="sr-only" role="status">Loading the pipelines</p>
+      <p class="sr-only" role="status">{t('Loading the pipelines')}</p>
       <span class="skeleton" style="display:block;height:520px;border-radius:var(--radius)"></span>
     </div>
   {:then list}
-    <DealForm creating {workspaceId} pipelines={list} submitLabel="Add deal" busyLabel="Adding…" {busy} {formError} {cancelHref} onsubmit={create} />
+    <DealForm creating {workspaceId} pipelines={list} submitLabel={t('Add deal')} busyLabel={t('Adding…')} {busy} {formError} {cancelHref} onsubmit={create} />
   {:catch err}
     <ErrorNotice message={err instanceof Error ? err.message : String(err)} onretry={() => location.reload()} />
   {/await}

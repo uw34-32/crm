@@ -15,12 +15,15 @@
  */
 
 /** The Web Locks name every tab of this origin rotates the refresh token under. */
+
+import { t } from '../i18n.svelte.js';
+
 export const REFRESH_LOCK = 'crm.refresh';
 
-const MSG_NETWORK = 'Cannot reach the server. Check your connection and try again.';
-const MSG_SERVER = 'Something went wrong on the server. Try again in a moment.';
-const MSG_BUSY = 'The server is busy. Try again in a moment.';
-const MSG_SESSION_ENDED = 'Your session has ended. Sign in again.';
+const msgNetwork = () => t('Cannot reach the server. Check your connection and try again.');
+const msgServer = () => t('Something went wrong on the server. Try again in a moment.');
+const msgBusy = () => t('The server is busy. Try again in a moment.');
+const msgSessionEnded = () => t('Your session has ended. Sign in again.');
 
 /** How long a refresh may take before it is given up, so a hung request cannot hold the lock every tab shares. */
 export const REFRESH_TIMEOUT_MS = 15000;
@@ -54,12 +57,12 @@ async function errorOf(res) {
   const apiMessage = typeof raw?.error === 'string' && raw.error ? raw.error : '';
   const retryAfter = retryAfterOf(res);
   if (res.status === 429) {
-    const wait = retryAfter === null ? 'Wait a moment' : `Wait ${retryAfter} ${retryAfter === 1 ? 'second' : 'seconds'}`;
-    return new ApiError(429, `Too many requests. ${wait} and try again.`, retryAfter);
+    const wait = retryAfter === null ? t('Wait a moment') : retryAfter === 1 ? t('Wait 1 second') : t('Wait {n} seconds', { n: retryAfter });
+    return new ApiError(429, t('Too many requests. {wait} and try again.', { wait }), retryAfter);
   }
-  if (res.status === 503) return new ApiError(503, MSG_BUSY, retryAfter);
-  if (res.status >= 500) return new ApiError(res.status, MSG_SERVER, retryAfter);
-  return new ApiError(res.status, apiMessage || MSG_SERVER, retryAfter);
+  if (res.status === 503) return new ApiError(503, msgBusy(), retryAfter);
+  if (res.status >= 500) return new ApiError(res.status, msgServer(), retryAfter);
+  return new ApiError(res.status, (apiMessage ? t(apiMessage) : msgServer()), retryAfter);
 }
 
 /** The browser's Web Locks, where it has them. @returns {Locks | null} */
@@ -102,14 +105,14 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd, locks = def
       return await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal });
     } catch (err) {
       if (isAbort(err)) throw err;
-      throw new ApiError(0, MSG_NETWORK);
+      throw new ApiError(0, msgNetwork());
     }
   }
 
   function endSession() {
     tokens.clear();
     onSessionEnd();
-    return new ApiError(401, MSG_SESSION_ENDED);
+    return new ApiError(401, msgSessionEnded());
   }
 
   /**
@@ -153,11 +156,11 @@ export function createClient({ baseUrl, fetch, tokens, onSessionEnd, locks = def
       if (!res.ok) throw await errorOf(res);
       const raw = await res.json().catch(() => null);
       // A body that stalls past the timeout reads as null, so say what went wrong.
-      if (abort.signal.aborted) throw new ApiError(0, MSG_NETWORK);
-      if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, MSG_SERVER);
+      if (abort.signal.aborted) throw new ApiError(0, msgNetwork());
+      if (!raw?.data?.token || !raw.data.refresh_token) throw new ApiError(res.status, msgServer());
       tokens.save(raw.data);
     } catch (err) {
-      if (abort.signal.aborted && isAbort(err)) throw new ApiError(0, MSG_NETWORK);
+      if (abort.signal.aborted && isAbort(err)) throw new ApiError(0, msgNetwork());
       throw err;
     } finally {
       clearTimeout(timer);

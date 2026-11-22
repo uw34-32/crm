@@ -12,8 +12,9 @@ import { ErrorNotice } from './ErrorNotice';
 import { Field } from './Field';
 import { MemberPicker } from './MemberPicker';
 import { OptionChips } from './OptionChips';
+import { t } from '../i18n';
 
-const KIND_LABELS: Record<ActivityKind, string> = { note: 'Note', call: 'Call', meeting: 'Meeting', task: 'Task' };
+const kindLabel = (kind: ActivityKind): string => ({ note: t('Note'), call: t('Call'), meeting: t('Meeting'), task: t('Task') })[kind];
 
 type Props = {
   workspaceId: string;
@@ -44,31 +45,31 @@ export function ActivityForm({ workspaceId, activity = null, busy, error, onSubm
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable accessibilityLabel="Close dialog" style={styles.backdrop} onPress={busy ? undefined : onCancel}>
+      <Pressable accessibilityLabel={t('Close dialog')} style={styles.backdrop} onPress={busy ? undefined : onCancel}>
         <Pressable accessibilityViewIsModal style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]} onPress={() => {}}>
           <ScrollView contentContainerStyle={{ gap: 14 }} keyboardShouldPersistTaps="handled">
             <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-              {activity ? 'Edit activity' : 'Add activity'}
+              {activity ? t('Edit activity') : t('Add activity')}
             </Text>
             {error ? <ErrorNotice message={toSentence(error)} /> : null}
             <OptionChips
-              label="Kind"
+              label={t('Kind')}
               value={kind}
               disabled={Boolean(activity)}
-              options={ACTIVITY_KINDS.map((k) => ({ value: k, label: KIND_LABELS[k] }))}
+              options={ACTIVITY_KINDS.map((k) => ({ value: k, label: kindLabel(k) }))}
               onChange={setKind}
             />
-            <Field label="Subject" value={subject} onChangeText={setSubject} error={errors.subject} />
-            <Field label="Notes" value={body} onChangeText={setBody} error={errors.body} multiline />
+            <Field label={t('Subject')} value={subject} onChangeText={setSubject} error={errors.subject} />
+            <Field label={t('Notes')} value={body} onChangeText={setBody} error={errors.body} multiline />
             {kind === 'task' ? (
               <>
-                <Field label="Due" value={due} onChangeText={setDue} error={errors.due_at} placeholder="2027-03-14 09:30" autoCapitalize="none" autoCorrect={false} />
-                <MemberPicker label="Assignee" workspaceId={workspaceId} value={assignee} onChange={setAssignee} emptyLabel="Nobody" />
+                <Field label={t('Due')} value={due} onChangeText={setDue} error={errors.due_at} placeholder="2027-03-14 09:30" autoCapitalize="none" autoCorrect={false} />
+                <MemberPicker label={t('Assignee')} workspaceId={workspaceId} value={assignee} onChange={setAssignee} emptyLabel={t('Nobody')} />
               </>
             ) : null}
             <View style={{ gap: 10 }}>
-              <Button label={activity ? 'Save changes' : 'Add activity'} busy={busy} onPress={submit} />
-              <Button label="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
+              <Button label={activity ? t('Save changes') : t('Add activity')} busy={busy} onPress={submit} />
+              <Button label={t('Cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
             </View>
           </ScrollView>
         </Pressable>

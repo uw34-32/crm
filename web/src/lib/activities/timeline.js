@@ -7,6 +7,8 @@
  * @typedef {'none' | 'open' | 'completed' | 'overdue' | 'today' | 'upcoming'} DueState
  */
 
+import { t } from '../i18n.svelte.js';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The local calendar day of a date, as YYYY-MM-DD. @param {Date} date */
@@ -21,8 +23,8 @@ const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.
 /** Today, Yesterday, or the day; the year only when it is not this one. @param {Date} date @param {Date} now @param {string} [locale] */
 export function dayLabel(date, now, locale) {
   const days = Math.round((startOfDay(now).getTime() - startOfDay(date).getTime()) / DAY_MS);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
+  if (days === 0) return t('Today');
+  if (days === 1) return t('Yesterday');
   const sameYear = date.getFullYear() === now.getFullYear();
   return new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).format(date);
 }
@@ -82,6 +84,6 @@ export function canEditActivity(activity, { userId, role }) {
  */
 export function memberName(members, userId) {
   const member = userId ? members.find((m) => m.user_id === userId) : undefined;
-  if (!member) return 'Former member';
+  if (!member) return t('Former member');
   return member.name?.trim() || member.email;
 }

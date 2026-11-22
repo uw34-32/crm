@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import ContactForm from '$lib/components/ContactForm.svelte';
@@ -30,11 +31,11 @@
     formError = '';
     try {
       const contact = /** @type {any} */ (await contacts.update(screen.workspaceId, id, body));
-      showToast(`Saved ${contactName(contact)}`);
+      showToast(t('Saved {name}', { name: contactName(contact) }));
       await goto(`/contacts/${id}`, { replaceState: true });
     } catch (err) {
       formError = isMissing(err)
-        ? 'This contact or the chosen company no longer exists. Someone may have deleted it.'
+        ? t('This contact or the chosen company no longer exists. Someone may have deleted it.')
         : toSentence(err instanceof Error ? err.message : String(err));
     } finally {
       busy = false;
@@ -43,24 +44,24 @@
 </script>
 
 <svelte:head>
-  <title>Edit {screen.state.record ? contactName(screen.state.record) : 'contact'} · CRM</title>
+  <title>{t('Edit {name}', { name: screen.state.record ? contactName(screen.state.record) : t('contact') })} · CRM</title>
 </svelte:head>
 
 {#if screen.state.status === 'missing'}
-  <NotFound title="Contact not found" backHref={screen.backHref()} backLabel="Back to contacts" />
+  <NotFound title={t('Contact not found')} backHref={screen.backHref()} backLabel="Back to contacts" />
 {:else if screen.state.status === 'error'}
-  <h1 class="page-title">Edit contact</h1>
+  <h1 class="page-title">{t('Edit contact')}</h1>
   <ErrorNotice message={screen.state.error} onretry={screen.reload} />
 {:else if screen.state.status === 'ready'}
   <div class="animate-in">
-    <h1 class="page-title">Edit {contactName(screen.state.record)}</h1>
-    <p class="page-lede">Clear a field to remove it.</p>
+    <h1 class="page-title">{t('Edit {name}', { name: contactName(screen.state.record) })}</h1>
+    <p class="page-lede">{t('Clear a field to remove it.')}</p>
     {#key screen.state.record.id}
       <ContactForm
         initial={screen.state.record}
         workspaceId={screen.workspaceId}
-        submitLabel="Save changes"
-        busyLabel="Saving…"
+        submitLabel={t('Save changes')}
+        busyLabel={t('Saving…')}
         {busy}
         {formError}
         cancelHref="/contacts/{id}"
@@ -70,7 +71,7 @@
   </div>
 {:else}
   <div aria-busy="true">
-    <p class="sr-only" role="status">Loading the contact</p>
+    <p class="sr-only" role="status">{t('Loading the contact')}</p>
     <span class="skeleton" style="display:block;width:50%;height:28px;margin-bottom:20px"></span>
     <span class="skeleton" style="display:block;height:420px;border-radius:var(--radius)"></span>
   </div>

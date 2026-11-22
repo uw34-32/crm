@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import ContactForm from '$lib/components/ContactForm.svelte';
@@ -32,11 +33,11 @@
     formError = '';
     try {
       const contact = /** @type {any} */ (await contacts.create(workspaceId, contactCreateBody(draft)));
-      showToast(`Added ${contactName(contact)}`);
+      showToast(t('Added {name}', { name: contactName(contact) }));
       await goto(`/contacts/${contact.id}`, { replaceState: true });
     } catch (err) {
       formError = isMissing(err)
-        ? 'The chosen company no longer exists. Choose another one, or remove the link.'
+        ? t('The chosen company no longer exists. Choose another one, or remove the link.')
         : toSentence(err instanceof Error ? err.message : String(err));
     } finally {
       busy = false;
@@ -45,23 +46,23 @@
 </script>
 
 <svelte:head>
-  <title>New contact · CRM</title>
+  <title>{t('New contact · CRM')}</title>
 </svelte:head>
 
 <div class="animate-in">
-  <h1 class="page-title">New contact</h1>
-  <p class="page-lede">Only the first name is required. Someone with one name goes there.</p>
+  <h1 class="page-title">{t('New contact')}</h1>
+  <p class="page-lede">{t('Only the first name is required. Someone with one name goes there.')}</p>
   {#await preset}
     <div aria-busy="true">
-      <p class="sr-only" role="status">Loading the company</p>
+      <p class="sr-only" role="status">{t('Loading the company')}</p>
       <span class="skeleton" style="display:block;height:420px;border-radius:var(--radius)"></span>
     </div>
   {:then company}
     <ContactForm
       initial={company ? { company_id: company.id, company_name: company.name } : {}}
       {workspaceId}
-      submitLabel="Add contact"
-      busyLabel="Adding…"
+      submitLabel={t('Add contact')}
+      busyLabel={t('Adding…')}
       {busy}
       {formError}
       {cancelHref}

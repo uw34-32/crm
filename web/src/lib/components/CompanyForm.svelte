@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   // Creates or edits a company. Checks mirror the API's limits and run on submit; the
   // first field with a problem takes focus, and each message is tied to its field.
   import { tick, untrack } from 'svelte';
@@ -49,20 +50,20 @@
 {/if}
 
 <form class="section-card section-card-body" novalidate onsubmit={submit}>
-  <Field id="company-name" label="Name" autocomplete="organization" required bind:value={draft.name} error={errors.name} />
+  <Field id="company-name" label={t('Name')} autocomplete="organization" required bind:value={draft.name} error={errors.name} />
   <Field
     id="company-domain"
-    label="Domain"
+    label={t('Domain')}
     autocomplete="off"
-    hint="Such as acme.example, without https://."
+    hint={t('Such as acme.example, without https://.')}
     bind:value={draft.domain}
     error={errors.domain}
   />
-  <Field id="company-industry" label="Industry" autocomplete="off" bind:value={draft.industry} error={errors.industry} />
-  <Field id="company-phone" label="Phone" type="tel" autocomplete="tel" bind:value={draft.phone} error={errors.phone} />
-  <Field id="company-address" label="Address" autocomplete="street-address" bind:value={draft.address} error={errors.address} />
+  <Field id="company-industry" label={t('Industry')} autocomplete="off" bind:value={draft.industry} error={errors.industry} />
+  <Field id="company-phone" label={t('Phone')} type="tel" autocomplete="tel" bind:value={draft.phone} error={errors.phone} />
+  <Field id="company-address" label={t('Address')} autocomplete="street-address" bind:value={draft.address} error={errors.address} />
   <div class="form-actions">
-    <a class="btn btn-secondary" href={cancelHref}>Cancel</a>
+    <a class="btn btn-secondary" href={cancelHref}>{t('Cancel')}</a>
     <button class="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? busyLabel : submitLabel}</button>
   </div>
 </form>

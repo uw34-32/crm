@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   // Creates or edits a contact. Checks mirror the API's limits and run on submit; the
   // first field with a problem takes focus, and each message is tied to its field.
   import { tick, untrack } from 'svelte';
@@ -25,7 +26,7 @@
   const order = /** @type {const} */ (['first_name', 'last_name', 'title', 'email', 'phone']);
   const draft = $state(untrack(() => Object.fromEntries(order.map((field) => [field, initial[field] ?? '']))));
   let company = $state(
-    untrack(() => (initial.company_id ? { id: initial.company_id, name: initial.company_name ?? 'Linked company' } : null))
+    untrack(() => (initial.company_id ? { id: initial.company_id, name: initial.company_name ?? t('Linked company') } : null))
   );
   /** @type {Record<string, string>} */
   let errors = $state({});
@@ -56,15 +57,15 @@
 
 <form class="section-card section-card-body" novalidate onsubmit={submit}>
   <div class="name-row">
-    <Field id="contact-first_name" label="First name" autocomplete="given-name" required bind:value={draft.first_name} error={errors.first_name} />
-    <Field id="contact-last_name" label="Last name" autocomplete="family-name" bind:value={draft.last_name} error={errors.last_name} />
+    <Field id="contact-first_name" label={t('First name')} autocomplete="given-name" required bind:value={draft.first_name} error={errors.first_name} />
+    <Field id="contact-last_name" label={t('Last name')} autocomplete="family-name" bind:value={draft.last_name} error={errors.last_name} />
   </div>
-  <Field id="contact-title" label="Job title" autocomplete="organization-title" bind:value={draft.title} error={errors.title} />
+  <Field id="contact-title" label={t('Job title')} autocomplete="organization-title" bind:value={draft.title} error={errors.title} />
   <CompanyPicker id="contact-company" {workspaceId} bind:value={company} />
-  <Field id="contact-email" label="Email" type="email" autocomplete="email" bind:value={draft.email} error={errors.email} />
-  <Field id="contact-phone" label="Phone" type="tel" autocomplete="tel" bind:value={draft.phone} error={errors.phone} />
+  <Field id="contact-email" label={t('Email')} type="email" autocomplete="email" bind:value={draft.email} error={errors.email} />
+  <Field id="contact-phone" label={t('Phone')} type="tel" autocomplete="tel" bind:value={draft.phone} error={errors.phone} />
   <div class="form-actions">
-    <a class="btn btn-secondary" href={cancelHref}>Cancel</a>
+    <a class="btn btn-secondary" href={cancelHref}>{t('Cancel')}</a>
     <button class="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? busyLabel : submitLabel}</button>
   </div>
 </form>

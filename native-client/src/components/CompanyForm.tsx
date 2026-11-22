@@ -5,6 +5,7 @@ import { validateCompany, type CompanyDraft } from '../lib/records/fields';
 import { Button } from './Button';
 import { ErrorNotice } from './ErrorNotice';
 import { Field, type TextInputHandle } from './Field';
+import { t } from '../i18n';
 
 type Props = {
   initial?: CompanyDraft;
@@ -37,13 +38,13 @@ export function CompanyForm({ initial = {}, submitLabel, busy, error, onSubmit, 
   return (
     <View style={{ gap: 16 }}>
       {error ? <ErrorNotice message={toSentence(error)} /> : null}
-      <Field label="Name" value={name} onChangeText={setName} error={errors.name} returnKeyType="next" onSubmitEditing={() => domainInput.current?.focus()} />
-      <Field ref={domainInput} label="Domain" value={domain} onChangeText={setDomain} error={errors.domain} placeholder="acme.example" autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="next" onSubmitEditing={() => phoneInput.current?.focus()} />
-      <Field ref={phoneInput} label="Phone" value={phone} onChangeText={setPhone} error={errors.phone} autoComplete="tel" keyboardType="phone-pad" returnKeyType="next" onSubmitEditing={() => industryInput.current?.focus()} />
-      <Field ref={industryInput} label="Industry" value={industry} onChangeText={setIndustry} error={errors.industry} returnKeyType="next" onSubmitEditing={() => addressInput.current?.focus()} />
-      <Field ref={addressInput} label="Address" value={address} onChangeText={setAddress} error={errors.address} multiline returnKeyType="done" />
+      <Field label={t('Name')} value={name} onChangeText={setName} error={errors.name} returnKeyType="next" onSubmitEditing={() => domainInput.current?.focus()} />
+      <Field ref={domainInput} label={t('Domain')} value={domain} onChangeText={setDomain} error={errors.domain} placeholder={t('acme.example')} autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="next" onSubmitEditing={() => phoneInput.current?.focus()} />
+      <Field ref={phoneInput} label={t('Phone')} value={phone} onChangeText={setPhone} error={errors.phone} autoComplete="tel" keyboardType="phone-pad" returnKeyType="next" onSubmitEditing={() => industryInput.current?.focus()} />
+      <Field ref={industryInput} label={t('Industry')} value={industry} onChangeText={setIndustry} error={errors.industry} returnKeyType="next" onSubmitEditing={() => addressInput.current?.focus()} />
+      <Field ref={addressInput} label={t('Address')} value={address} onChangeText={setAddress} error={errors.address} multiline returnKeyType="done" />
       <Button label={submitLabel} busy={busy} onPress={submit} />
-      <Button label="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
+      <Button label={t('Cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
     </View>
   );
 }

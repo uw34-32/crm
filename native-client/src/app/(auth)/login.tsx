@@ -9,6 +9,7 @@ import { checkEmail, checkPassword, toSentence } from '../../lib/forms';
 import { useStore } from '../../lib/store';
 import { session } from '../../services';
 import { useTheme } from '../../theme';
+import { t } from '../../i18n';
 
 export default function Login() {
   const theme = useTheme();
@@ -36,17 +37,17 @@ export default function Login() {
 
   return (
     <AuthScreen
-      title="Sign in"
+      title={t('Sign in')}
       footer={
         <Text style={{ color: theme.text2 }}>
-          New here? <Link href="/register" style={{ color: theme.accentText }}>Create an account</Link>
+          {t('New here?')} <Link href="/register" style={{ color: theme.accentText }}>{t('Create an account')}</Link>
         </Text>
       }
     >
-      {ended && !formError ? <Text style={{ color: theme.text2 }}>Your session has ended. Sign in again to continue.</Text> : null}
+      {ended && !formError ? <Text style={{ color: theme.text2 }}>{t('Your session has ended. Sign in again to continue.')}</Text> : null}
       {formError ? <ErrorNotice message={formError} /> : null}
       <Field
-        label="Email"
+        label={t('Email')}
         value={email}
         onChangeText={setEmail}
         error={errors.email}
@@ -59,7 +60,7 @@ export default function Login() {
       />
       <Field
         ref={passwordInput}
-        label="Password"
+        label={t('Password')}
         value={password}
         onChangeText={setPassword}
         error={errors.password}
@@ -69,7 +70,7 @@ export default function Login() {
         returnKeyType="go"
         onSubmitEditing={() => void submit()}
       />
-      <Button label={busy ? 'Signing in…' : 'Sign in'} busy={busy} onPress={() => void submit()} />
+      <Button label={busy ? t('Signing in…') : t('Sign in')} busy={busy} onPress={() => void submit()} />
     </AuthScreen>
   );
 }

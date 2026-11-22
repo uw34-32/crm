@@ -1,4 +1,5 @@
 <script>
+  import { nameOf, t } from '$lib/i18n.svelte.js';
   // Creates or edits a deal. Creating also picks the pipeline and the stage it starts
   // in; an existing deal changes stage only by moving, so editing leaves them out.
   // Checks mirror the API's limits and run on submit.
@@ -42,8 +43,8 @@
       owner_id: initial.owner_id ?? ''
     }))
   );
-  let company = $state(untrack(() => (initial.company_id ? { id: initial.company_id, name: initial.company_name ?? 'Linked company' } : null)));
-  let contact = $state(untrack(() => (initial.contact_id ? { id: initial.contact_id, name: initial.contact_name ?? 'Linked contact' } : null)));
+  let company = $state(untrack(() => (initial.company_id ? { id: initial.company_id, name: initial.company_name ?? t('Linked company') } : null)));
+  let contact = $state(untrack(() => (initial.contact_id ? { id: initial.contact_id, name: initial.contact_name ?? t('Linked contact') } : null)));
   /** @type {Record<string, string>} */
   let errors = $state({});
   /** @type {HTMLElement | null} */
@@ -68,7 +69,7 @@
       } catch {
         if (stagesFor !== pipelineId) return;
         stages = [];
-        stagesError = 'The stages could not be loaded. The deal will start in the first stage.';
+        stagesError = t('The stages could not be loaded. The deal will start in the first stage.');
       }
     });
   });
@@ -96,28 +97,28 @@
 {/if}
 
 <form class="section-card section-card-body" novalidate onsubmit={submit}>
-  <Field id="deal-title" label="Title" required bind:value={draft.title} error={errors.title} />
+  <Field id="deal-title" label={t('Title')} required bind:value={draft.title} error={errors.title} />
   <div class="row">
-    <Field id="deal-value" label="Value" hint="In the currency's main unit, such as 1250.50." bind:value={draft.value} error={errors.value} />
-    <Field id="deal-currency" label="Currency" autocomplete="off" hint="Three letters, such as EUR." bind:value={draft.currency} error={errors.currency} />
+    <Field id="deal-value" label={t('Value')} hint={t('In the currency\'s main unit, such as 1250.50.')} bind:value={draft.value} error={errors.value} />
+    <Field id="deal-currency" label={t('Currency')} autocomplete="off" hint={t('Three letters, such as EUR.')} bind:value={draft.currency} error={errors.currency} />
   </div>
   {#if creating}
     <div class="row">
       <div class="form-group">
-        <label class="form-label" for="deal-pipeline_id">Pipeline</label>
+        <label class="form-label" for="deal-pipeline_id">{t('Pipeline')}</label>
         <select id="deal-pipeline_id" class="select" bind:value={draft.pipeline_id} aria-invalid={errors.pipeline_id ? 'true' : undefined}>
           {#each pipelines as pipeline (pipeline.id)}
-            <option value={pipeline.id}>{pipeline.name}</option>
+            <option value={pipeline.id}>{nameOf(pipeline.name)}</option>
           {/each}
         </select>
         {#if errors.pipeline_id}<p class="form-error">{errors.pipeline_id}</p>{/if}
       </div>
       <div class="form-group">
-        <label class="form-label" for="deal-stage_id">Starting stage</label>
+        <label class="form-label" for="deal-stage_id">{t('Starting stage')}</label>
         <select id="deal-stage_id" class="select" bind:value={draft.stage_id} aria-describedby={stagesError ? 'deal-stage-error' : undefined}>
-          <option value="">First stage</option>
+          <option value="">{t('First stage')}</option>
           {#each stages as stage (stage.id)}
-            <option value={stage.id}>{stage.name}</option>
+            <option value={stage.id}>{nameOf(stage.name)}</option>
           {/each}
         </select>
         {#if stagesError}<p class="form-error" id="deal-stage-error">{stagesError}</p>{/if}
@@ -125,7 +126,7 @@
     </div>
   {/if}
   <div class="form-group">
-    <label class="form-label" for="deal-expected_close_date">Expected close date</label>
+    <label class="form-label" for="deal-expected_close_date">{t('Expected close date')}</label>
     <input
       id="deal-expected_close_date"
       class="input"
@@ -141,16 +142,16 @@
   <CompanyPicker id="deal-company" {workspaceId} bind:value={company} />
   <ContactPicker id="deal-contact" {workspaceId} bind:value={contact} />
   <div class="form-group">
-    <label class="form-label" for="deal-owner_id">Owner</label>
+    <label class="form-label" for="deal-owner_id">{t('Owner')}</label>
     <select id="deal-owner_id" class="select" bind:value={draft.owner_id}>
-      <option value="">{creating ? 'Me' : 'No owner'}</option>
+      <option value="">{creating ? t('Me') : t('No owner')}</option>
       {#each members.list as member (member.user_id)}
         <option value={member.user_id}>{member.name || member.email}</option>
       {/each}
     </select>
   </div>
   <div class="form-actions">
-    <a class="btn btn-secondary" href={cancelHref}>Cancel</a>
+    <a class="btn btn-secondary" href={cancelHref}>{t('Cancel')}</a>
     <button class="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? busyLabel : submitLabel}</button>
   </div>
 </form>

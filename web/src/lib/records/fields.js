@@ -3,6 +3,7 @@
 // changed, clears an optional field with an empty string (the API refuses null on
 // text), and unlinks a contact's company with company_id: null.
 
+import { t } from '../i18n.svelte.js';
 import { EMAIL_SHAPE } from '../forms.js';
 
 /**
@@ -35,18 +36,18 @@ const chars = (/** @type {string} */ value) => [...value].length;
 
 /** @param {string} value @param {number} max */
 function tooLong(value, max) {
-  return chars(value) > max ? `Use at most ${max} characters.` : '';
+  return chars(value) > max ? t('Use at most {n} characters.', { n: max }) : '';
 }
 
 /** @param {string} value */
 function checkOptionalEmail(value) {
-  return value && !EMAIL_SHAPE.test(value) ? 'Enter an email address such as ada@example.com.' : '';
+  return value && !EMAIL_SHAPE.test(value) ? t('Enter an email address such as ada@example.com.') : '';
 }
 
 /** @param {string} value */
 function checkOptionalPhone(value) {
   if (!value) return '';
-  if (!DIGIT.test(value)) return 'A phone number needs at least one digit.';
+  if (!DIGIT.test(value)) return t('A phone number needs at least one digit.');
   return tooLong(value, LIMITS.phone);
 }
 
@@ -67,7 +68,7 @@ const compact = (errors) => Object.fromEntries(Object.entries(errors).filter(([,
 export function validateContact(draft) {
   const first = text(draft.first_name);
   return compact({
-    first_name: first ? tooLong(first, LIMITS.first_name) : 'Enter a first name.',
+    first_name: first ? tooLong(first, LIMITS.first_name) : t('Enter a first name.'),
     last_name: tooLong(text(draft.last_name), LIMITS.last_name),
     email: checkOptionalEmail(text(draft.email)),
     phone: checkOptionalPhone(text(draft.phone)),
@@ -80,8 +81,8 @@ export function validateCompany(draft) {
   const name = text(draft.name);
   const domain = text(draft.domain).toLowerCase();
   return compact({
-    name: name ? tooLong(name, LIMITS.company_name) : 'Enter a company name.',
-    domain: domain && !isDomain(domain) ? 'Enter a domain such as acme.example, without https:// or a path.' : '',
+    name: name ? tooLong(name, LIMITS.company_name) : t('Enter a company name.'),
+    domain: domain && !isDomain(domain) ? t('Enter a domain such as acme.example, without https:// or a path.') : '',
     phone: checkOptionalPhone(text(draft.phone)),
     industry: tooLong(text(draft.industry), LIMITS.industry),
     address: tooLong(text(draft.address), LIMITS.address)

@@ -1,4 +1,5 @@
 <script>
+  import { dateLocale, t } from '$lib/i18n.svelte.js';
   import { ArrowLeft, Pencil, Trash2 } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -20,7 +21,7 @@
   const screen = recordScreen('contacts', contacts, () => id);
   const contact = $derived(screen.state.status === 'ready' ? screen.state.record : null);
   const name = $derived(contact ? contactName(contact) : '');
-  const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+  const date = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(date) };
 
   let confirming = $state(false);
   let deleting = $state(false);
@@ -41,32 +42,32 @@
       }
     }
     confirming = false;
-    showToast(`Deleted ${name}`);
+    showToast(t('Deleted {name}', { name }));
     await goto(screen.backHref(), { replaceState: true });
   }
 </script>
 
 <svelte:head>
-  <title>{name || 'Contact'} · CRM</title>
+  <title>{name || t('Contact')} · CRM</title>
 </svelte:head>
 
 {#if screen.state.status === 'missing'}
-  <NotFound title="Contact not found" backHref={screen.backHref()} backLabel="Back to contacts" />
+  <NotFound title={t('Contact not found')} backHref={screen.backHref()} backLabel="Back to contacts" />
 {:else}
   <div class="detail-header">
-    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> Contacts</a>
+    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> {t('Contacts')}</a>
     {#if contact}
       <div class="detail-actions">
-        <a class="btn-ghost" href="/contacts/{contact.id}/edit"><Pencil size={18} aria-hidden="true" /> Edit</a>
+        <a class="btn-ghost" href="/contacts/{contact.id}/edit"><Pencil size={18} aria-hidden="true" /> {t('Edit')}</a>
         <button type="button" class="btn-ghost danger" onclick={() => (confirming = true)}>
-          <Trash2 size={18} aria-hidden="true" /> Delete
+          <Trash2 size={18} aria-hidden="true" /> {t('Delete')}
         </button>
       </div>
     {/if}
   </div>
 
   {#if screen.state.status === 'error'}
-    <h1 class="page-title">Contact</h1>
+    <h1 class="page-title">{t('Contact')}</h1>
     <ErrorNotice message={screen.state.error} onretry={screen.reload} />
   {:else if contact}
     <div class="animate-in">
@@ -86,41 +87,41 @@
 
       <section class="section-card" aria-labelledby="contact-details">
         <div class="section-card-header">
-          <h2 id="contact-details" class="section-card-title">Details</h2>
+          <h2 id="contact-details" class="section-card-title">{t('Details')}</h2>
         </div>
         {#if contact.email || contact.phone || contact.company_name}
           <dl class="section-card-body">
             {#if contact.email}
               <div class="field-row">
-                <dt class="field-label">Email</dt>
+                <dt class="field-label">{t('Email')}</dt>
                 <dd class="field-value"><a href="mailto:{contact.email}">{contact.email}</a></dd>
               </div>
             {/if}
             {#if contact.phone}
               <div class="field-row">
-                <dt class="field-label">Phone</dt>
+                <dt class="field-label">{t('Phone')}</dt>
                 <dd class="field-value"><a href="tel:{contact.phone}">{contact.phone}</a></dd>
               </div>
             {/if}
             {#if contact.company_name}
               <div class="field-row">
-                <dt class="field-label">Company</dt>
+                <dt class="field-label">{t('Company')}</dt>
                 <dd class="field-value"><a href="/companies/{contact.company_id}">{contact.company_name}</a></dd>
               </div>
             {/if}
           </dl>
         {:else}
-          <p class="section-card-body muted">No email, phone, or company yet. <a href="/contacts/{contact.id}/edit">Add details</a></p>
+          <p class="section-card-body muted">{t('No email, phone, or company yet.')} <a href="/contacts/{contact.id}/edit">{t('Add details')}</a></p>
         {/if}
       </section>
 
       <ActivityTimeline workspaceId={screen.workspaceId} link={{ contact_id: contact.id }} subjectName={name} />
 
-      <p class="detail-meta">Added {date.format(new Date(contact.created_at))} · Updated {date.format(new Date(contact.updated_at))}</p>
+      <p class="detail-meta">{t('Added {date}', { date: date.format(new Date(contact.created_at)) })} · {t('Updated {date}', { date: date.format(new Date(contact.updated_at)) })}</p>
     </div>
   {:else}
     <div aria-busy="true">
-      <p class="sr-only" role="status">Loading the contact</p>
+      <p class="sr-only" role="status">{t('Loading the contact')}</p>
       <div class="detail-hero">
         <span class="skeleton skeleton-circle" style="width:64px;height:64px"></span>
         <span class="skeleton" style="width:200px;height:28px"></span>
@@ -132,10 +133,10 @@
 
 <ConfirmDialog
   open={confirming}
-  title="Delete {name || 'this contact'}?"
-  message="They leave the contact list for everyone in the workspace. Deals keep their history without the person."
-  confirmLabel="Delete contact"
-  busyLabel="Deleting…"
+  title={t('Delete {name}?', { name: name || t('this contact') })}
+  message={t('They leave the contact list for everyone in the workspace. Deals keep their history without the person.')}
+  confirmLabel={t('Delete contact')}
+  busyLabel={t('Deleting…')}
   busy={deleting}
   error={deleteError}
   onconfirm={remove}

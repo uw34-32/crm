@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { radius, useTheme } from '../theme';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function AuthScreen({ title, children, footer }: { title: string; children: ReactNode; footer: ReactNode }) {
   const theme = useTheme();
@@ -16,6 +17,7 @@ export function AuthScreen({ title, children, footer }: { title: string; childre
             <View style={styles.body}>{children}</View>
           </View>
           <View style={styles.footer}>{footer}</View>
+          <LanguageSwitcher />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

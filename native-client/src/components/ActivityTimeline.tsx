@@ -17,12 +17,13 @@ import { Button } from './Button';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNotice } from './ErrorNotice';
 import { TextAction } from './TextAction';
+import { dateLocale, t } from '../i18n';
 
 const activities = activitiesApi(session.api);
-const KIND_LABELS = { note: 'Note', call: 'Call', meeting: 'Meeting', task: 'Task' } as const;
-const time = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const kindLabel = (kind: 'note' | 'call' | 'meeting' | 'task'): string => ({ note: t('Note'), call: t('Call'), meeting: t('Meeting'), task: t('Task') })[kind];
+const formatTime = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' }).format(value);
 
-const DUE_TEXT: Record<DueState, string> = { none: '', open: 'Open', completed: 'Done', overdue: 'Overdue', today: 'Due today', upcoming: 'Upcoming' };
+const dueText = (state: DueState): string => ({ none: '', open: t('Open'), completed: t('Done'), overdue: t('Overdue'), today: t('Due today'), upcoming: t('Upcoming') })[state];
 
 type Props = { workspaceId: string; link: ActivityLink };
 
@@ -110,16 +111,16 @@ export function ActivityTimeline({ workspaceId, link }: Props) {
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>
-        Activity
+        {t('Activity')}
       </Text>
-      <Button label="Add activity" variant="secondary" onPress={() => { setFormError(''); setFormFor('new'); }} />
+      <Button label={t('Add activity')} variant="secondary" onPress={() => { setFormError(''); setFormFor('new'); }} />
       {rowError ? <ErrorNotice message={rowError} /> : null}
       {list.status === 'error' ? (
         <ErrorNotice message={list.error} onRetry={() => void pager.load('')} />
       ) : list.status !== 'ready' ? (
-        <ActivityIndicator accessibilityLabel="Loading activity" />
+        <ActivityIndicator accessibilityLabel={t('Loading activity')} />
       ) : list.items.length === 0 ? (
-        <Text style={{ color: theme.text2 }}>Nothing yet. Add a note, a call, a meeting, or a task.</Text>
+        <Text style={{ color: theme.text2 }}>{t('Nothing yet. Add a note, a call, a meeting, or a task.')}</Text>
       ) : (
         groups.map((group) => (
           <View key={group.key} style={{ gap: 8 }}>
@@ -130,20 +131,20 @@ export function ActivityTimeline({ workspaceId, link }: Props) {
               return (
                 <View key={activity.id} style={[styles.item, { backgroundColor: theme.bg, borderColor: state === 'overdue' ? theme.danger : theme.border }]}>
                   <Text style={{ color: theme.text2, fontSize: 13 }}>
-                    {KIND_LABELS[activity.kind]}
-                    {state !== 'none' ? ` · ${DUE_TEXT[state]}` : ''}
-                    {activity.due_at ? ` · ${time.format(new Date(activity.due_at))}` : ''}
+                    {kindLabel(activity.kind)}
+                    {state !== 'none' ? ` · ${dueText(state)}` : ''}
+                    {activity.due_at ? ` · ${formatTime(new Date(activity.due_at))}` : ''}
                   </Text>
                   <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600', textDecorationLine: activity.completed_at ? 'line-through' : 'none' }}>{activity.subject}</Text>
                   {activity.body ? <Text style={{ color: theme.text }}>{activity.body}</Text> : null}
                   <Text style={{ color: theme.text2, fontSize: 13 }}>
                     {memberName(members, activity.author_id)}
-                    {activity.assignee_id ? ` · for ${memberName(members, activity.assignee_id)}` : ''}
+                    {activity.assignee_id ? ` · ${t('for {name}', { name: memberName(members, activity.assignee_id) })}` : ''}
                   </Text>
                   <View style={styles.actions}>
-                    {activity.kind === 'task' ? <TextAction label={working === activity.id ? 'Working…' : activity.completed_at ? 'Reopen' : 'Complete'} onPress={() => void toggle(activity)} /> : null}
-                    {mayEdit ? <TextAction label="Edit" onPress={() => { setFormError(''); setFormFor(activity); }} /> : null}
-                    {mayEdit ? <TextAction label="Delete" danger onPress={() => { setDeleteError(''); setDeleting(activity); }} /> : null}
+                    {activity.kind === 'task' ? <TextAction label={working === activity.id ? t('Working…') : activity.completed_at ? t('Reopen') : t('Complete')} onPress={() => void toggle(activity)} /> : null}
+                    {mayEdit ? <TextAction label={t('Edit')} onPress={() => { setFormError(''); setFormFor(activity); }} /> : null}
+                    {mayEdit ? <TextAction label={t('Delete')} danger onPress={() => { setDeleteError(''); setDeleting(activity); }} /> : null}
                   </View>
                 </View>
               );
@@ -151,14 +152,14 @@ export function ActivityTimeline({ workspaceId, link }: Props) {
           </View>
         ))
       )}
-      {list.status === 'ready' && list.hasMore ? <Button label={list.loadingMore ? 'Loading…' : 'Show older activity'} variant="secondary" busy={list.loadingMore} onPress={() => void pager.more()} /> : null}
+      {list.status === 'ready' && list.hasMore ? <Button label={list.loadingMore ? t('Loading…') : t('Show older activity')} variant="secondary" busy={list.loadingMore} onPress={() => void pager.more()} /> : null}
       {list.moreError ? <ErrorNotice message={list.moreError} onRetry={() => void pager.more()} /> : null}
       {formFor ? <ActivityForm workspaceId={workspaceId} activity={formFor === 'new' ? null : formFor} busy={formBusy} error={formError} onSubmit={(d) => void save(d)} onCancel={() => setFormFor(null)} /> : null}
       <ConfirmDialog
         visible={deleting !== null}
-        title="Delete this activity?"
-        message={deleting ? `“${deleting.subject}” is removed from the timeline.` : ''}
-        confirmLabel="Delete activity"
+        title={t('Delete this activity?')}
+        message={deleting ? t('“{name}” is removed from the timeline.', { name: deleting.subject }) : ''}
+        confirmLabel={t('Delete activity')}
         busy={deleteBusy}
         error={deleteError}
         onConfirm={() => void remove()}

@@ -495,3 +495,14 @@ Build only through `pnpm desktop:build` (or `tauri build`): a plain `cargo build
 It needs Rust and, on Linux, the WebKitGTK 4.1 and GTK 3 development packages. The window's origin is `tauri://localhost` on Linux and macOS and `http://tauri.localhost` on Windows; `dev.sh` already allows both in `CORS_ORIGINS`. The API address is baked in at export time from `EXPO_PUBLIC_API_URL`, `http://localhost:8085` by default, so a build for another API sets it first.
 
 `desktop:build` also writes the Content-Security-Policy for that build: the window may connect only to its own origin and to the API's origin, scripts must come from the app itself, and images from the app, `data:`, or `blob:`. A script that got into the page therefore cannot send the refresh token elsewhere. The committed `tauri.conf.json` carries the same policy for the default API, which `tauri dev` uses. Styles keep `'unsafe-inline'` and `dangerousDisableAssetCspModification` leaves `style-src` alone, because Tauri's nonce would otherwise make the browser ignore it and block the styles React Native Web injects at run time. The refresh token lives in `localStorage` inside the window's own data directory, with the tradeoff described under [Session and tokens](#session-and-tokens). The app shows no remote images; if one is added, `img-src` needs its origin.
+
+## Languages
+
+The web app and the native app (and the desktop window, which is the native web export) speak English and Spanish. The first language is the saved choice, then the browser's or the device's, then English, and a selector changes it: in the top bar on the web, and on the sign-in screens and Home in the native app. The choice is kept on the device (`crm.locale`).
+
+The English text is the key: `t('Sign in')` is English as it stands, and the Spanish is looked up in `web/src/lib/es.js` and `native-client/src/i18n/es.ts`, which hold the same table and are kept alike by hand. A text with no entry shows in English. Tests run in English, so they read the same as before, and each app has a test that fails when a `t('...')` text has no Spanish entry or a translation drops a `{mark}`.
+
+- To add a text, wrap it in `t()` (`t('Added {name}', { name })` for a value) and add its Spanish to both tables. Build a sentence from whole texts, not from pieces, and give a plural its own two texts.
+- The names a workspace's first pipeline starts with (Sales, Lead, Qualified, Proposal, Negotiation, Won, Lost) are translated through `nameOf`; a name someone typed stays as typed. Contact, company, and deal data are never translated.
+- The API's messages are English. The clients translate the ones listed in the tables (`invalid email or password`, `workspace not found`, and so on) and show any other as the server wrote it.
+- Dates follow the language. Money amounts still use the browser's or device's own format.

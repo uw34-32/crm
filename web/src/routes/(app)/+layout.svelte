@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { Building2, Kanban, LayoutDashboard, LogOut, Users } from '@lucide/svelte';
   import { tick } from 'svelte';
   import { afterNavigate, goto } from '$app/navigation';
@@ -6,6 +7,7 @@
   import BrandMark from '$lib/components/BrandMark.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import { focusMainHeading, movedToAnotherPage } from '$lib/focus.js';
+  import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
   import WorkspaceSwitcher from '$lib/components/WorkspaceSwitcher.svelte';
   import { session, signOut } from '$lib/session.svelte.js';
   import { showToast } from '$lib/toast.svelte.js';
@@ -14,10 +16,10 @@
   let { children } = $props();
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/contacts', label: 'Contacts', icon: Users },
-    { href: '/companies', label: 'Companies', icon: Building2 },
-    { href: '/pipeline', label: 'Pipeline', icon: Kanban, also: '/deals' }
+    { href: '/dashboard', label: () => t('Dashboard'), icon: LayoutDashboard },
+    { href: '/contacts', label: () => t('Contacts'), icon: Users },
+    { href: '/companies', label: () => t('Companies'), icon: Building2 },
+    { href: '/pipeline', label: () => t('Pipeline'), icon: Kanban, also: '/deals' }
   ];
 
   /** @param {string} path @param {string} href */
@@ -66,24 +68,25 @@
 </script>
 
 {#if session.user}
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">{t('Skip to content')}</a>
   <header class="topbar">
     <div class="topbar-inner">
-      <a href="/dashboard" class="brand" aria-label="CRM dashboard">
+      <a href="/dashboard" class="brand" aria-label={t('CRM dashboard')}>
         <BrandMark />
-        <span class="brand-name" aria-hidden="true">CRM</span>
+        <span class="brand-name" aria-hidden="true">{t('CRM')}</span>
       </a>
-      <nav class="topnav" aria-label="Main">
+      <nav class="topnav" aria-label={t('Main')}>
         {#each navItems as item (item.href)}
-          <a href={item.href} class="topnav-link" aria-current={isCurrent(item) ? 'page' : undefined}>{item.label}</a>
+          <a href={item.href} class="topnav-link" aria-current={isCurrent(item) ? 'page' : undefined}>{item.label()}</a>
         {/each}
       </nav>
       <WorkspaceSwitcher />
+      <LanguageSwitcher />
       <div class="account">
         <span class="account-name" title={session.user.email}>{session.user.name}</span>
         <button type="button" class="btn-ghost sign-out" onclick={handleSignOut}>
           <LogOut size={18} aria-hidden="true" />
-          <span class="sign-out-label">Sign out</span>
+          <span class="sign-out-label">{t('Sign out')}</span>
         </button>
       </div>
     </div>
@@ -96,7 +99,7 @@
       {@render children()}
     {:else}
       <div class="loading" aria-busy="true">
-        <p class="sr-only" role="status">Loading your workspaces</p>
+        <p class="sr-only" role="status">{t('Loading your workspaces')}</p>
         <span class="skeleton title-skeleton"></span>
         <span class="skeleton skeleton-line line-skeleton"></span>
         <span class="skeleton card-skeleton"></span>
@@ -104,12 +107,12 @@
     {/if}
   </main>
 
-  <nav class="tabbar" aria-label="Main">
+  <nav class="tabbar" aria-label={t('Main')}>
     {#each navItems as item (item.href)}
       {@const Icon = item.icon}
       <a href={item.href} class="tab" aria-current={isCurrent(item) ? 'page' : undefined}>
         <Icon size={22} aria-hidden="true" />
-        <span>{item.label}</span>
+        <span>{item.label()}</span>
       </a>
     {/each}
   </nav>

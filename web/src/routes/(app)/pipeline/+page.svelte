@@ -1,4 +1,5 @@
 <script>
+  import { nameOf, t } from '$lib/i18n.svelte.js';
   import { Plus } from '@lucide/svelte';
   import { tick, untrack } from 'svelte';
   import DealCard from '$lib/components/DealCard.svelte';
@@ -118,15 +119,15 @@
 </script>
 
 <svelte:head>
-  <title>{board.pipeline?.name ?? 'Pipeline'} · {workspaces.current?.name ?? 'CRM'}</title>
+  <title>{board.pipeline ? nameOf(board.pipeline.name) : t('Pipeline')} · {workspaces.current?.name ?? 'CRM'}</title>
 </svelte:head>
 
 <div class="animate-in">
   <div class="page-header">
     <div class="heading">
-      <h1 class="page-title">Pipeline</h1>
+      <h1 class="page-title">{t('Pipeline')}</h1>
       {#if board.pipelines.length > 1}
-        <label class="sr-only" for="pipeline-select">Pipeline</label>
+        <label class="sr-only" for="pipeline-select">{t('Pipeline')}</label>
         <select
           id="pipeline-select"
           class="select pipeline-select"
@@ -134,15 +135,15 @@
           onchange={(event) => screen.choose(event.currentTarget.value)}
         >
           {#each board.pipelines as pipeline (pipeline.id)}
-            <option value={pipeline.id}>{pipeline.name}</option>
+            <option value={pipeline.id}>{nameOf(pipeline.name)}</option>
           {/each}
         </select>
       {:else if board.pipeline}
-        <p class="pipeline-name">{board.pipeline.name}</p>
+        <p class="pipeline-name">{nameOf(board.pipeline.name)}</p>
       {/if}
     </div>
     <a class="btn btn-primary" href="/deals/new{board.pipeline ? `?pipeline=${encodeURIComponent(board.pipeline.id)}` : ''}">
-      <Plus size={18} aria-hidden="true" /> New deal
+      <Plus size={18} aria-hidden="true" /> {t('New deal')}
     </a>
   </div>
 
@@ -150,7 +151,7 @@
     <ErrorNotice message={board.error} onretry={screen.reload} />
   {:else if board.status === 'loading'}
     <div class="board" aria-busy="true">
-      <p class="sr-only" role="status">Loading the pipeline</p>
+      <p class="sr-only" role="status">{t('Loading the pipeline')}</p>
       {#each { length: 4 } as _, i (i)}
         <div class="column">
           <span class="skeleton" style="display:block;height:20px;width:60%;margin:8px 8px 12px"></span>
@@ -161,21 +162,21 @@
     </div>
   {:else if !board.pipeline}
     <div class="empty-state">
-      <p class="empty-state-title">No pipeline yet</p>
-      <p class="empty-state-text">Every workspace starts with one, so this one should return after a reload.</p>
-      <button type="button" class="btn btn-secondary" onclick={screen.reload}>Reload</button>
+      <p class="empty-state-title">{t('No pipeline yet')}</p>
+      <p class="empty-state-text">{t('Every workspace starts with one, so this one should return after a reload.')}</p>
+      <button type="button" class="btn btn-secondary" onclick={screen.reload}>{t('Reload')}</button>
     </div>
   {:else}
     {#if empty}
       <div class="empty-state board-empty">
-        <p class="empty-state-title">No deals in {board.pipeline.name} yet</p>
-        <p class="empty-state-text">A deal starts in the first stage and moves across the board as it progresses. Drag a card, or use its Move button.</p>
+        <p class="empty-state-title">{t('No deals in {name} yet', { name: nameOf(board.pipeline.name) })}</p>
+        <p class="empty-state-text">{t('A deal starts in the first stage and moves across the board as it progresses. Drag a card, or use its Move button.')}</p>
       </div>
     {/if}
     {#if board.truncated}
-      <p class="load-error" role="status">This pipeline has more open deals than the board shows. Close or move some to see the rest.</p>
+      <p class="load-error" role="status">{t('This pipeline has more open deals than the board shows. Close or move some to see the rest.')}</p>
     {/if}
-    <div class="board" role="list" aria-label="Stages of {board.pipeline.name}">
+    <div class="board" role="list" aria-label={t('Stages of {name}', { name: nameOf(board.pipeline.name) })}>
       {#each board.columns as column (column.stage.id)}
         {@const kind = closedKind(column)}
         {@const total = totalOf(column)}
@@ -193,7 +194,7 @@
         >
           <header class="column-header">
             <span class="stage-dot" style:background={column.stage.color} aria-hidden="true"></span>
-            <h2 class="stage-name" id="stage-{column.stage.id}">{column.stage.name}</h2>
+            <h2 class="stage-name" id="stage-{column.stage.id}">{nameOf(column.stage.name)}</h2>
             <span class="stage-count">{column.deals.length}{column.hasMore ? '+' : ''}<span class="sr-only"> {column.deals.length === 1 ? 'deal' : 'deals'}</span></span>
             {#if total}
               <span class="stage-total">{total}</span>
@@ -218,7 +219,7 @@
               <div class="drop-mark" aria-hidden="true"></div>
             {/if}
             {#if column.deals.length === 0 && !column.hasMore}
-              <p class="column-empty">No deals</p>
+              <p class="column-empty">{t('No deals')}</p>
             {/if}
             {#if kind && column.hasMore}
               <div class="column-more">

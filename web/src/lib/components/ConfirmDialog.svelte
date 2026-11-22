@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   // A confirmation on the native modal dialog: the page behind is inert, Tab stays
   // inside, and Escape cancels. It opens on the safe choice, Cancel, so Enter never
   // confirms by accident, and focus returns to what opened it when it is cancelled.
@@ -17,7 +18,7 @@
    *   oncancel: () => void
    * }}
    */
-  let { open, title, message, confirmLabel, busyLabel = 'Working…', busy = false, error = '', onconfirm, oncancel } = $props();
+  let { open, title, message, confirmLabel, busyLabel = t('Working…'), busy = false, error = '', onconfirm, oncancel } = $props();
 
   /** @type {HTMLDialogElement | null} */
   let dialog = $state(null);
@@ -69,7 +70,7 @@
     <p class="form-error dialog-error" role="alert">{error}</p>
   {/if}
   <div class="modal-actions">
-    <button type="button" class="btn btn-secondary" bind:this={cancelButton} onclick={cancel} disabled={busy}>Cancel</button>
+    <button type="button" class="btn btn-secondary" bind:this={cancelButton} onclick={cancel} disabled={busy}>{t('Cancel')}</button>
     <button type="button" class="btn btn-danger" onclick={onconfirm} disabled={busy} aria-busy={busy}>
       {busy ? busyLabel : confirmLabel}
     </button>

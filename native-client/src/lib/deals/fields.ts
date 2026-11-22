@@ -3,6 +3,7 @@
 // The stage and the pipeline change only through a move, never through a PATCH.
 
 import { parseMoney } from './money';
+import { t } from '../../i18n';
 
 export type DealDraft = {
   title?: string;
@@ -27,17 +28,17 @@ const LINKS = ['company_id', 'contact_id', 'owner_id'] as const;
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
-const tooLong = (value: string, max: number) => ([...value].length > max ? `Use at most ${max} characters.` : '');
+const tooLong = (value: string, max: number) => ([...value].length > max ? t('Use at most {n} characters.', { n: max }) : '');
 
 /** A YYYY-MM-DD that names a real day. */
 export function checkDate(value: string) {
   if (!value) return '';
   const match = DATE.exec(value);
-  if (!match) return 'Enter a date such as 2027-03-14.';
+  if (!match) return t('Enter a date such as 2027-03-14.');
   const [, y, m, d] = match.map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
-  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return 'Enter a date such as 2027-03-14.';
-  if (y < MIN_YEAR || y > MAX_YEAR) return 'Use a date from 1900 to 2200.';
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return t('Enter a date such as 2027-03-14.');
+  if (y < MIN_YEAR || y > MAX_YEAR) return t('Use a date from 1900 to 2200.');
   return '';
 }
 
@@ -48,10 +49,10 @@ export function validateDeal(draft: DealDraft): Record<string, string> {
   const currency = text(draft.currency);
   const currencyOk = CURRENCY.test(currency);
   return compact({
-    title: title ? tooLong(title, DEAL_LIMITS.title) : 'Enter a title.',
-    currency: currencyOk ? '' : 'Enter a three-letter currency code such as EUR.',
+    title: title ? tooLong(title, DEAL_LIMITS.title) : t('Enter a title.'),
+    currency: currencyOk ? '' : t('Enter a three-letter currency code such as EUR.'),
     value: currencyOk ? (parseMoney(text(draft.value), currency).error ?? '') : '',
-    pipeline_id: text(draft.pipeline_id) ? '' : 'Choose a pipeline.',
+    pipeline_id: text(draft.pipeline_id) ? '' : t('Choose a pipeline.'),
     expected_close_date: checkDate(text(draft.expected_close_date))
   });
 }

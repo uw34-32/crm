@@ -2,6 +2,8 @@
 // bodies. A due time lives in the form as the local text of a datetime-local field and
 // travels as an instant. Only a task has a due time and an assignee.
 
+import { t } from '../../i18n';
+
 export type ActivityKind = 'note' | 'call' | 'meeting' | 'task';
 export type ActivityDraft = { kind: ActivityKind; subject?: string; body?: string; due_at?: string; assignee_id?: string | null };
 export type ActivityLink = { deal_id: string } | { contact_id: string } | { company_id: string };
@@ -15,7 +17,7 @@ const LOCAL_INPUT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
-const tooLong = (value: string, max: number) => ([...value].length > max ? `Use at most ${max} characters.` : '');
+const tooLong = (value: string, max: number) => ([...value].length > max ? t('Use at most {n} characters.', { n: max }) : '');
 
 /** An instant as the local value a datetime-local field holds, to the minute. */
 export function toLocalInput(iso: string | null | undefined) {
@@ -37,9 +39,9 @@ export function fromLocalInput(value: string) {
 function checkDue(value: string) {
   if (!value) return '';
   const iso = fromLocalInput(value);
-  if (!iso) return 'Enter a date and time.';
+  if (!iso) return t('Enter a date and time.');
   const year = new Date(iso).getUTCFullYear();
-  return year < MIN_YEAR || year > MAX_YEAR ? 'Use a date from 1900 to 2200.' : '';
+  return year < MIN_YEAR || year > MAX_YEAR ? t('Use a date from 1900 to 2200.') : '';
 }
 
 const compact = (errors: Record<string, string>) => Object.fromEntries(Object.entries(errors).filter(([, message]) => message));
@@ -47,7 +49,7 @@ const compact = (errors: Record<string, string>) => Object.fromEntries(Object.en
 export function validateActivity(draft: ActivityDraft): Record<string, string> {
   const subject = text(draft.subject);
   return compact({
-    subject: subject ? tooLong(subject, ACTIVITY_LIMITS.subject) : 'Enter a subject.',
+    subject: subject ? tooLong(subject, ACTIVITY_LIMITS.subject) : t('Enter a subject.'),
     body: tooLong(text(draft.body), ACTIVITY_LIMITS.body),
     due_at: draft.kind === 'task' ? checkDue(text(draft.due_at)) : ''
   });

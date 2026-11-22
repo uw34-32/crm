@@ -1,4 +1,5 @@
 <script>
+  import { dateLocale, nameOf, t } from '$lib/i18n.svelte.js';
   import { ArrowLeft, Pencil, Trash2 } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
@@ -23,8 +24,8 @@
   const id = $derived(page.params.id ?? '');
   const screen = recordScreen('pipeline', deals, () => id);
   const deal = $derived(screen.state.status === 'ready' ? screen.state.record : null);
-  const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
-  const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+  const date = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(date) };
+  const day = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium', timeZone: 'UTC' }).format(date) };
 
   untrack(() => loadMembers(screen.workspaceId));
 
@@ -68,9 +69,9 @@
       const body = lostReason ? { stage_id: stageId, lost_reason: lostReason } : { stage_id: stageId };
       const moved = /** @type {Record<string, any>} */ (await deals.move(screen.workspaceId, deal.id, body));
       Object.assign(screen.state, { record: { ...deal, ...moved } });
-      showToast(`Moved to ${stages.find((s) => s.id === stageId)?.name ?? 'the new stage'}`);
+      showToast(t('Moved to {stage}', { stage: stages.find((s) => s.id === stageId)?.name ?? t('the new stage') }));
     } catch (err) {
-      showToast(`The move failed. ${toSentence(err instanceof Error ? err.message : String(err))}`, 5000);
+      showToast(`${t('The move failed.')} ${toSentence(err instanceof Error ? err.message : String(err))}`, 5000);
       if (isMissing(err)) screen.reload();
     } finally {
       moveBusy = false;
@@ -109,32 +110,32 @@
       }
     }
     confirming = false;
-    showToast(`Deleted ${deal.title}`);
+    showToast(t('Deleted {name}', { name: deal.title }));
     await goto(screen.backHref(), { replaceState: true });
   }
 </script>
 
 <svelte:head>
-  <title>{deal?.title ?? 'Deal'} · CRM</title>
+  <title>{deal?.title ?? t('Deal')} · CRM</title>
 </svelte:head>
 
 {#if screen.state.status === 'missing'}
-  <NotFound title="Deal not found" backHref={screen.backHref()} backLabel="Back to the pipeline" />
+  <NotFound title={t('Deal not found')} backHref={screen.backHref()} backLabel="Back to the pipeline" />
 {:else}
   <div class="detail-header">
-    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> Pipeline</a>
+    <a class="btn-ghost" href={screen.backHref()}><ArrowLeft size={18} aria-hidden="true" /> {t('Pipeline')}</a>
     {#if deal}
       <div class="detail-actions">
-        <a class="btn-ghost" href="/deals/{deal.id}/edit"><Pencil size={18} aria-hidden="true" /> Edit</a>
+        <a class="btn-ghost" href="/deals/{deal.id}/edit"><Pencil size={18} aria-hidden="true" /> {t('Edit')}</a>
         <button type="button" class="btn-ghost danger" onclick={() => (confirming = true)}>
-          <Trash2 size={18} aria-hidden="true" /> Delete
+          <Trash2 size={18} aria-hidden="true" /> {t('Delete')}
         </button>
       </div>
     {/if}
   </div>
 
   {#if screen.state.status === 'error'}
-    <h1 class="page-title">Deal</h1>
+    <h1 class="page-title">{t('Deal')}</h1>
     <ErrorNotice message={screen.state.error} onretry={screen.reload} />
   {:else if deal}
     <div class="animate-in">
@@ -143,23 +144,23 @@
           <h1 class="page-title">{deal.title}</h1>
           <p class="detail-subtitle">
             {deal.value_minor > 0 ? formatMoney(deal.value_minor, deal.currency) : 'No value yet'}
-            {#if pipelineName} · {pipelineName}{/if}
+            {#if pipelineName} · {nameOf(pipelineName)}{/if}
           </p>
         </div>
       </div>
 
       <section class="section-card" aria-labelledby="deal-details">
         <div class="section-card-header">
-          <h2 id="deal-details" class="section-card-title">Details</h2>
+          <h2 id="deal-details" class="section-card-title">{t('Details')}</h2>
         </div>
         <dl class="section-card-body">
           <div class="field-row">
-            <dt class="field-label"><label for="deal-stage">Stage</label></dt>
+            <dt class="field-label"><label for="deal-stage">{t('Stage')}</label></dt>
             <dd class="field-value stage-control">
               {#if stages.length > 0}
                 <select id="deal-stage" class="select" value={deal.stage_id} onchange={onStage} disabled={moveBusy} aria-busy={moveBusy}>
                   {#each stages as s (s.id)}
-                    <option value={s.id}>{s.name}</option>
+                    <option value={s.id}>{nameOf(s.name)}</option>
                   {/each}
                 </select>
               {:else if stagesError}
@@ -170,41 +171,41 @@
             </dd>
           </div>
           <div class="field-row">
-            <dt class="field-label">Status</dt>
-            <dd class="field-value">{stage ? `${deal.status === 'open' ? 'Open' : deal.status === 'won' ? 'Won' : 'Lost'}` : deal.status}</dd>
+            <dt class="field-label">{t('Status')}</dt>
+            <dd class="field-value">{stage ? (deal.status === 'open' ? t('Open') : deal.status === 'won' ? t('Won') : t('Lost')) : deal.status}</dd>
           </div>
           {#if deal.status === 'lost' && deal.lost_reason}
             <div class="field-row">
-              <dt class="field-label">Lost because</dt>
+              <dt class="field-label">{t('Lost because')}</dt>
               <dd class="field-value reason">{deal.lost_reason}</dd>
             </div>
           {/if}
           {#if deal.expected_close_date}
             <div class="field-row">
-              <dt class="field-label">Expected close</dt>
+              <dt class="field-label">{t('Expected close')}</dt>
               <dd class="field-value">{day.format(new Date(`${deal.expected_close_date}T00:00:00Z`))}</dd>
             </div>
           {/if}
           {#if deal.closed_at}
             <div class="field-row">
-              <dt class="field-label">Closed</dt>
+              <dt class="field-label">{t('Closed')}</dt>
               <dd class="field-value">{date.format(new Date(deal.closed_at))}</dd>
             </div>
           {/if}
           {#if deal.company_id}
             <div class="field-row">
-              <dt class="field-label">Company</dt>
+              <dt class="field-label">{t('Company')}</dt>
               <dd class="field-value"><a href="/companies/{deal.company_id}">{deal.company_name}</a></dd>
             </div>
           {/if}
           {#if deal.contact_id}
             <div class="field-row">
-              <dt class="field-label">Contact</dt>
+              <dt class="field-label">{t('Contact')}</dt>
               <dd class="field-value"><a href="/contacts/{deal.contact_id}">{deal.contact_name}</a></dd>
             </div>
           {/if}
           <div class="field-row">
-            <dt class="field-label">Owner</dt>
+            <dt class="field-label">{t('Owner')}</dt>
             <dd class="field-value">{owner || (deal.owner_id ? '' : 'No owner')}</dd>
           </div>
         </dl>
@@ -212,11 +213,11 @@
 
       <ActivityTimeline workspaceId={screen.workspaceId} link={{ deal_id: deal.id }} subjectName={deal.title} />
 
-      <p class="detail-meta">Added {date.format(new Date(deal.created_at))} · Updated {date.format(new Date(deal.updated_at))}</p>
+      <p class="detail-meta">{t('Added {date}', { date: date.format(new Date(deal.created_at)) })} · {t('Updated {date}', { date: date.format(new Date(deal.updated_at)) })}</p>
     </div>
   {:else}
     <div aria-busy="true">
-      <p class="sr-only" role="status">Loading the deal</p>
+      <p class="sr-only" role="status">{t('Loading the deal')}</p>
       <span class="skeleton" style="display:block;width:50%;height:28px;margin-bottom:20px"></span>
       <span class="skeleton" style="display:block;height:240px;border-radius:var(--radius)"></span>
     </div>
@@ -238,10 +239,10 @@
 
 <ConfirmDialog
   open={confirming}
-  title="Delete {deal?.title ?? 'this deal'}?"
-  message="It leaves the pipeline for everyone in the workspace, and its activities that are linked only to it go too."
-  confirmLabel="Delete deal"
-  busyLabel="Deleting…"
+  title={t('Delete {name}?', { name: deal?.title ?? t('this deal') })}
+  message={t('It leaves the pipeline for everyone in the workspace, and its activities that are linked only to it go too.')}
+  confirmLabel={t('Delete deal')}
+  busyLabel={t('Deleting…')}
   busy={deleting}
   error={deleteError}
   onconfirm={remove}

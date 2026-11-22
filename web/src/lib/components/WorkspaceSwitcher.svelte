@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { Plus } from '@lucide/svelte';
   import { showToast } from '$lib/toast.svelte.js';
   import { selectWorkspace, workspaces } from '$lib/workspaces.svelte.js';
@@ -6,20 +7,20 @@
   /** @param {Event & { currentTarget: HTMLSelectElement }} event */
   function change(event) {
     selectWorkspace(event.currentTarget.value);
-    if (workspaces.current) showToast(`Switched to ${workspaces.current.name}`);
+    if (workspaces.current) showToast(t('Switched to {name}', { name: workspaces.current.name }));
   }
 </script>
 
 <div class="switcher">
   {#if workspaces.list.length > 0}
-    <label for="workspace-switcher" class="sr-only">Workspace</label>
+    <label for="workspace-switcher" class="sr-only">{t('Workspace')}</label>
     <select id="workspace-switcher" class="select switcher-select" value={workspaces.current?.id} onchange={change}>
       {#each workspaces.list as workspace (workspace.id)}
         <option value={workspace.id}>{workspace.name}</option>
       {/each}
     </select>
   {/if}
-  <a href="/workspaces/new" class="icon-btn" aria-label="Create a workspace" title="Create a workspace">
+  <a href="/workspaces/new" class="icon-btn" aria-label={t('Create a workspace')} title={t('Create a workspace')}>
     <Plus size={20} aria-hidden="true" />
   </a>
 </div>

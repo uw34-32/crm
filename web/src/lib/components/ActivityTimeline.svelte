@@ -1,4 +1,5 @@
 <script>
+  import { dateLocale, t } from '$lib/i18n.svelte.js';
   // The activities of one deal, contact, or company, newest first and grouped by day.
   // A note, call, meeting, or task is added from the form on top; a task can be
   // completed and reopened by anyone, and the author, an owner, or an admin can edit
@@ -22,22 +23,24 @@
   /**
    * @type {{ workspaceId: string, link: { deal_id: string } | { contact_id: string } | { company_id: string }, subjectName?: string }}
    */
-  let { workspaceId, link, subjectName = 'this record' } = $props();
+  let { workspaceId, link, subjectName = '' } = $props();
 
   const activities = activitiesApi(api);
+  const kindLabel = (/** @type {string} */ k) => ({ note: t('Note'), call: t('Call'), meeting: t('Meeting'), task: t('Task') })[/** @type {'note'} */ (k)];
+  const kindName = (/** @type {string | undefined} */ k) => (k ? kindLabel(k).toLowerCase() : t('activity'));
   const kindInfo = {
-    note: { label: 'Note', icon: NotebookPen },
-    call: { label: 'Call', icon: Phone },
-    meeting: { label: 'Meeting', icon: Handshake },
-    task: { label: 'Task', icon: ListTodo }
+    note: { icon: NotebookPen },
+    call: { icon: Phone },
+    meeting: { icon: Handshake },
+    task: { icon: ListTodo }
   };
 
   const list = $state(/** @type {import('$lib/records/list.js').ListState<any>} */ (emptyList()));
   const filterOf = () => /** @type {Record<string, string>} */ (link);
   const pager = createPager(list, ({ limit, offset }) => activities.list(workspaceId, { ...filterOf(), limit, offset }));
   const now = new Date();
-  const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
-  const dueFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const timeFormat = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { timeStyle: 'short' }).format(date) };
+  const dueFormat = { format: (/** @type {Date} */ date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' }).format(date) };
 
   $effect(() => {
     const key = Object.values(link).join();
@@ -48,7 +51,7 @@
     return () => pager.stop();
   });
 
-  const groups = $derived(/** @type {{ key: string, label: string, items: any[] }[]} */ (groupByDay(list.items, now)));
+  const groups = $derived(/** @type {{ key: string, label: string, items: any[] }[]} */ (groupByDay(list.items, now, dateLocale())));
   const actor = $derived({ userId: session.user?.id ?? '', role: workspaces.current?.role ?? 'member' });
 
   // Composer
@@ -75,7 +78,7 @@
       const created = await activities.create(workspaceId, activityCreateBody({ kind, ...draft }, link));
       list.items = [/** @type {any} */ (created), ...list.items];
       draft = blank();
-      showToast(`${kindInfo[kind].label} added`);
+      showToast(t('{kind} added', { kind: kindLabel(kind) }));
     } catch (err) {
       addError = toSentence(err instanceof Error ? err.message : String(err));
     } finally {
@@ -148,7 +151,7 @@
       if (isMissing(err)) {
         list.items = list.items.filter((item) => item.id !== editing.id);
         editing = null;
-        showToast('That activity no longer exists.');
+        showToast(t('That activity no longer exists.'));
       } else {
         editError = toSentence(err instanceof Error ? err.message : String(err));
       }
@@ -180,48 +183,48 @@
     list.items = list.items.filter((item) => item.id !== gone);
     deleting = null;
     deleteBusy = false;
-    showToast('Activity deleted');
+    showToast(t('Activity deleted'));
   }
 
   /** @param {any} activity */
   const stateOf = (activity) => dueState(activity, now);
   /** @param {'overdue' | 'today' | 'upcoming' | 'completed' | 'open' | 'none'} state */
-  const stateLabel = (state) => ({ overdue: 'Overdue', today: 'Due today', upcoming: 'Upcoming', completed: 'Done', open: 'Open', none: '' })[state];
+  const stateLabel = (state) => ({ overdue: t('Overdue'), today: t('Due today'), upcoming: t('Upcoming'), completed: t('Done'), open: t('Open'), none: '' })[state];
 </script>
 
 <section class="section-card" aria-labelledby="timeline-title">
   <div class="section-card-header">
-    <h2 id="timeline-title" class="section-card-title">Activity</h2>
+    <h2 id="timeline-title" class="section-card-title">{t('Activity')}</h2>
   </div>
 
   <form class="composer" novalidate onsubmit={add}>
-    <div class="kinds" role="radiogroup" aria-label="Kind of activity">
+    <div class="kinds" role="radiogroup" aria-label={t('Kind of activity')}>
       {#each ACTIVITY_KINDS as k (k)}
         {@const Icon = kindInfo[k].icon}
         <label class="kind" class:selected={kind === k}>
           <input type="radio" name="activity-kind" value={k} bind:group={kind} class="sr-only" />
           <Icon size={16} aria-hidden="true" />
-          {kindInfo[k].label}
+          {kindLabel(k)}
         </label>
       {/each}
     </div>
-    <Field id="activity-new-subject" label={kind === 'task' ? 'What needs doing' : 'Subject'} bind:value={draft.subject} error={errors.subject} required />
+    <Field id="activity-new-subject" label={kind === 'task' ? t('What needs doing') : t('Subject')} bind:value={draft.subject} error={errors.subject} required />
     <div class="form-group">
-      <label class="form-label" for="activity-new-body">Details (optional)</label>
+      <label class="form-label" for="activity-new-body">{t('Details (optional)')}</label>
       <textarea id="activity-new-body" class="input" rows="2" bind:value={draft.body} aria-invalid={errors.body ? 'true' : undefined}></textarea>
       {#if errors.body}<p class="form-error">{errors.body}</p>{/if}
     </div>
     {#if kind === 'task'}
       <div class="task-row">
         <div class="form-group">
-          <label class="form-label" for="activity-new-due_at">Due</label>
+          <label class="form-label" for="activity-new-due_at">{t('Due')}</label>
           <input id="activity-new-due_at" class="input" type="datetime-local" bind:value={draft.due_at} aria-invalid={errors.due_at ? 'true' : undefined} />
           {#if errors.due_at}<p class="form-error">{errors.due_at}</p>{/if}
         </div>
         <div class="form-group">
-          <label class="form-label" for="activity-new-assignee">Assignee</label>
+          <label class="form-label" for="activity-new-assignee">{t('Assignee')}</label>
           <select id="activity-new-assignee" class="select" bind:value={draft.assignee_id}>
-            <option value="">Nobody</option>
+            <option value="">{t('Nobody')}</option>
             {#each members.list as member (member.user_id)}
               <option value={member.user_id}>{member.name || member.email}</option>
             {/each}
@@ -233,7 +236,7 @@
     <div class="form-actions">
       <button class="btn btn-primary" type="submit" disabled={adding} aria-busy={adding}>
         <Plus size={18} aria-hidden="true" />
-        {adding ? 'Adding…' : `Add ${kindInfo[kind].label.toLowerCase()}`}
+        {adding ? t('Adding…') : t('Add {kind}', { kind: kindName(kind) })}
       </button>
     </div>
   </form>
@@ -242,12 +245,12 @@
     <div class="section-card-body"><ErrorNotice message={list.error} onretry={() => pager.load('')} /></div>
   {:else if list.status !== 'ready' && list.items.length === 0}
     <div class="section-card-body" aria-busy="true">
-      <p class="sr-only" role="status">Loading the activity</p>
+      <p class="sr-only" role="status">{t('Loading the activity')}</p>
       <span class="skeleton skeleton-line" style="display:block;width:70%;margin-bottom:10px"></span>
       <span class="skeleton skeleton-line" style="display:block;width:45%"></span>
     </div>
   {:else if list.items.length === 0}
-    <p class="section-card-body muted">Nothing logged for {subjectName} yet. Add a note after your next call.</p>
+    <p class="section-card-body muted">{t('Nothing logged for {name} yet. Add a note after your next call.', { name: subjectName })}</p>
   {:else}
     {#each groups as group (group.key)}
       <div class="day">
@@ -265,7 +268,7 @@
                   onclick={() => toggle(activity)}
                   disabled={Boolean(toggling[activity.id])}
                   aria-pressed={Boolean(activity.completed_at)}
-                  aria-label={activity.completed_at ? `Reopen ${activity.subject}` : `Complete ${activity.subject}`}
+                  aria-label={activity.completed_at ? t('Reopen {name}', { name: activity.subject }) : t('Complete {name}', { name: activity.subject })}
                 >
                   {#if activity.completed_at}<CircleCheckBig size={22} aria-hidden="true" />{:else}<Circle size={22} aria-hidden="true" />{/if}
                 </button>
@@ -275,23 +278,23 @@
               <div class="item-main">
                 {#if editing?.id === activity.id}
                   <form class="edit" novalidate onsubmit={saveEdit}>
-                    <Field id="activity-edit-subject" label="Subject" bind:value={editDraft.subject} error={editErrors.subject} required />
+                    <Field id="activity-edit-subject" label={t('Subject')} bind:value={editDraft.subject} error={editErrors.subject} required />
                     <div class="form-group">
-                      <label class="form-label" for="activity-edit-body">Details</label>
+                      <label class="form-label" for="activity-edit-body">{t('Details')}</label>
                       <textarea id="activity-edit-body" class="input" rows="2" bind:value={editDraft.body}></textarea>
                       {#if editErrors.body}<p class="form-error">{editErrors.body}</p>{/if}
                     </div>
                     {#if activity.kind === 'task'}
                       <div class="task-row">
                         <div class="form-group">
-                          <label class="form-label" for="activity-edit-due">Due</label>
+                          <label class="form-label" for="activity-edit-due">{t('Due')}</label>
                           <input id="activity-edit-due" class="input" type="datetime-local" bind:value={editDraft.due_at} />
                           {#if editErrors.due_at}<p class="form-error">{editErrors.due_at}</p>{/if}
                         </div>
                         <div class="form-group">
-                          <label class="form-label" for="activity-edit-assignee">Assignee</label>
+                          <label class="form-label" for="activity-edit-assignee">{t('Assignee')}</label>
                           <select id="activity-edit-assignee" class="select" bind:value={editDraft.assignee_id}>
-                            <option value="">Nobody</option>
+                            <option value="">{t('Nobody')}</option>
                             {#each members.list as member (member.user_id)}
                               <option value={member.user_id}>{member.name || member.email}</option>
                             {/each}
@@ -301,31 +304,31 @@
                     {/if}
                     {#if editError}<p class="form-error" role="alert">{editError}</p>{/if}
                     <div class="form-actions">
-                      <button type="button" class="btn btn-secondary" onclick={() => (editing = null)}>Cancel</button>
+                      <button type="button" class="btn btn-secondary" onclick={() => (editing = null)}>{t('Cancel')}</button>
                       <button type="submit" class="btn btn-primary" disabled={saving} aria-busy={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
                     </div>
                   </form>
                 {:else}
-                  <p class="subject"><span class="sr-only">{info.label}: </span>{activity.subject}</p>
+                  <p class="subject"><span class="sr-only">{kindLabel(activity.kind)}: </span>{activity.subject}</p>
                   {#if activity.body}<p class="body">{activity.body}</p>{/if}
                   <p class="meta">
                     {timeFormat.format(new Date(activity.created_at))} · {memberName(members.list, activity.author_id)}
                     {#if activity.kind === 'task'}
-                      {#if activity.assignee_id} · For {memberName(members.list, activity.assignee_id)}{/if}
+                      {#if activity.assignee_id} · {t('For {name}', { name: memberName(members.list, activity.assignee_id) })}{/if}
                       {#if activity.due_at}
                         · <span class="due {state}"><CalendarClock size={13} aria-hidden="true" /> {dueFormat.format(new Date(activity.due_at))}{#if state === 'overdue' || state === 'today'} ({stateLabel(state).toLowerCase()}){/if}</span>
                       {/if}
-                      {#if activity.completed_at} · Done{/if}
+                      {#if activity.completed_at} · {t('Done')}{/if}
                     {/if}
                   </p>
                 {/if}
               </div>
               {#if editing?.id !== activity.id && canEditActivity(activity, actor)}
                 <div class="item-actions">
-                  <button type="button" class="icon-btn" onclick={() => startEdit(activity)} aria-label="Edit {activity.subject}" title="Edit">
+                  <button type="button" class="icon-btn" onclick={() => startEdit(activity)} aria-label={t('Edit {name}', { name: activity.subject })} title={t('Edit')}>
                     <Pencil size={16} aria-hidden="true" />
                   </button>
-                  <button type="button" class="icon-btn" onclick={() => (deleting = activity)} aria-label="Delete {activity.subject}" title="Delete">
+                  <button type="button" class="icon-btn" onclick={() => (deleting = activity)} aria-label={t('Delete {name}', { name: activity.subject })} title={t('Delete')}>
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
@@ -348,10 +351,10 @@
 
 <ConfirmDialog
   open={deleting !== null}
-  title="Delete this {deleting?.kind ?? 'activity'}?"
-  message="It leaves the timeline for everyone in the workspace."
-  confirmLabel="Delete {deleting?.kind ?? 'activity'}"
-  busyLabel="Deleting…"
+  title={t('Delete this {kind}?', { kind: kindName(deleting?.kind) })}
+  message={t('It leaves the timeline for everyone in the workspace.')}
+  confirmLabel={t('Delete {kind}', { kind: kindName(deleting?.kind) })}
+  busyLabel={t('Deleting…')}
   busy={deleteBusy}
   error={deleteError}
   onconfirm={confirmDelete}

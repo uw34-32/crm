@@ -17,9 +17,10 @@ import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/ho
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
+import { dateLocale, t } from '../../../../i18n';
 
 const contacts = recordsApi(session.api, 'contacts');
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function ContactDetail() {
   const theme = useTheme();
@@ -32,7 +33,7 @@ export default function ContactDetail() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  if (state.status === 'missing') return <NotFound title="Contact not found" backHref="/contacts" backLabel="contacts" />;
+  if (state.status === 'missing') return <NotFound title={t('Contact not found')} backHref="/contacts" backLabel={t('contacts')} />;
 
   const contact = state.record;
   const name = contact ? contactName(contact) : '';
@@ -60,13 +61,13 @@ export default function ContactDetail() {
 
   return (
     <ScreenFrame
-      backLabel="Contacts"
+      backLabel={t('Contacts')}
       backHref="/contacts"
       actions={
         contact ? (
           <>
-            <TextAction label="Edit" onPress={() => router.push(`/contacts/${contact.id}/edit`)} />
-            <TextAction label="Delete" danger onPress={() => setConfirming(true)} />
+            <TextAction label={t('Edit')} onPress={() => router.push(`/contacts/${contact.id}/edit`)} />
+            <TextAction label={t('Delete')} danger onPress={() => setConfirming(true)} />
           </>
         ) : null
       }
@@ -74,12 +75,12 @@ export default function ContactDetail() {
       {state.status === 'error' ? (
         <>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-            Contact
+            {t('Contact')}
           </Text>
           <ErrorNotice message={state.error} onRetry={() => void reload()} />
         </>
       ) : !contact ? (
-        <ActivityIndicator accessibilityLabel="Loading the contact" />
+        <ActivityIndicator accessibilityLabel={t('Loading the contact')} />
       ) : (
         <>
           <View style={styles.hero}>
@@ -93,30 +94,30 @@ export default function ContactDetail() {
               ) : null}
             </View>
           </View>
-          <DetailCard title="Details">
+          <DetailCard title={t('Details')}>
             {contact.email || contact.phone || contact.company_name ? (
               <>
-                {contact.email ? <DetailRow label="Email" value={contact.email} url={`mailto:${contact.email}`} /> : null}
-                {contact.phone ? <DetailRow label="Phone" value={contact.phone} url={`tel:${contact.phone}`} /> : null}
+                {contact.email ? <DetailRow label={t('Email')} value={contact.email} url={`mailto:${contact.email}`} /> : null}
+                {contact.phone ? <DetailRow label={t('Phone')} value={contact.phone} url={`tel:${contact.phone}`} /> : null}
                 {contact.company_name && contact.company_id ? (
-                  <DetailRow label="Company" value={contact.company_name} onPress={() => router.push(`/companies/${contact.company_id}`)} />
+                  <DetailRow label={t('Company')} value={contact.company_name} onPress={() => router.push(`/companies/${contact.company_id}`)} />
                 ) : null}
               </>
             ) : (
-              <Text style={{ color: theme.text2 }}>No email, phone, or company yet.</Text>
+              <Text style={{ color: theme.text2 }}>{t('No email, phone, or company yet.')}</Text>
             )}
           </DetailCard>
           {workspaceId ? <ActivityTimeline workspaceId={workspaceId} link={{ contact_id: contact.id }} /> : null}
           <Text style={{ color: theme.text2, fontSize: 13 }}>
-            Added {date.format(new Date(contact.created_at))} · Updated {date.format(new Date(contact.updated_at))}
+            {t('Added {date}', { date: formatDate(new Date(contact.created_at)) })} · {t('Updated {date}', { date: formatDate(new Date(contact.updated_at)) })}
           </Text>
         </>
       )}
       <ConfirmDialog
         visible={confirming}
-        title={`Delete ${name || 'this contact'}?`}
-        message="They are removed from your contacts. Deals keep their history without the contact."
-        confirmLabel="Delete contact"
+        title={t('Delete {name}?', { name: name || t('this contact') })}
+        message={t('They are removed from your contacts. Deals keep their history without the contact.')}
+        confirmLabel={t('Delete contact')}
         busy={deleting}
         error={deleteError}
         onConfirm={() => void remove()}

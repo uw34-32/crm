@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -32,11 +33,11 @@
     formError = '';
     try {
       const deal = /** @type {{ title: string }} */ (await deals.update(screen.workspaceId, id, body));
-      showToast(`Saved ${deal.title}`);
+      showToast(t('Saved {name}', { name: deal.title }));
       await goto(`/deals/${id}`, { replaceState: true });
     } catch (err) {
       formError = isMissing(err)
-        ? 'This deal or the chosen company, contact, or owner no longer exists. Someone may have deleted it.'
+        ? t('This deal or the chosen company, contact, or owner no longer exists. Someone may have deleted it.')
         : toSentence(err instanceof Error ? err.message : String(err));
     } finally {
       busy = false;
@@ -45,24 +46,24 @@
 </script>
 
 <svelte:head>
-  <title>Edit {screen.state.record?.title ?? 'deal'} · CRM</title>
+  <title>{t('Edit {name}', { name: screen.state.record?.title ?? t('deal') })} · CRM</title>
 </svelte:head>
 
 {#if screen.state.status === 'missing'}
-  <NotFound title="Deal not found" backHref={screen.backHref()} backLabel="Back to the pipeline" />
+  <NotFound title={t('Deal not found')} backHref={screen.backHref()} backLabel="Back to the pipeline" />
 {:else if screen.state.status === 'error'}
-  <h1 class="page-title">Edit deal</h1>
+  <h1 class="page-title">{t('Edit deal')}</h1>
   <ErrorNotice message={screen.state.error} onretry={screen.reload} />
 {:else if screen.state.status === 'ready'}
   <div class="animate-in">
-    <h1 class="page-title">Edit {screen.state.record.title}</h1>
-    <p class="page-lede">The stage changes by moving the deal on the board or from its page.</p>
+    <h1 class="page-title">{t('Edit {name}', { name: screen.state.record.title })}</h1>
+    <p class="page-lede">{t('The stage changes by moving the deal on the board or from its page.')}</p>
     {#key screen.state.record.id}
       <DealForm
         initial={screen.state.record}
         workspaceId={screen.workspaceId}
-        submitLabel="Save changes"
-        busyLabel="Saving…"
+        submitLabel={t('Save changes')}
+        busyLabel={t('Saving…')}
         {busy}
         {formError}
         cancelHref="/deals/{id}"
@@ -72,7 +73,7 @@
   </div>
 {:else}
   <div aria-busy="true">
-    <p class="sr-only" role="status">Loading the deal</p>
+    <p class="sr-only" role="status">{t('Loading the deal')}</p>
     <span class="skeleton" style="display:block;width:50%;height:28px;margin-bottom:20px"></span>
     <span class="skeleton" style="display:block;height:480px;border-radius:var(--radius)"></span>
   </div>

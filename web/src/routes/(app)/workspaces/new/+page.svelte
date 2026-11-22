@@ -1,4 +1,5 @@
 <script>
+  import { t } from '$lib/i18n.svelte.js';
   import { goto } from '$app/navigation';
   import { onMount, tick } from 'svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
@@ -23,7 +24,7 @@
   async function submit(event) {
     event.preventDefault();
     formError = '';
-    error = checkName(name, 'Enter a name for the workspace.');
+    error = checkName(name, t('Enter a name for the workspace.'));
     if (error) {
       document.getElementById('workspace-name')?.focus();
       return;
@@ -31,7 +32,7 @@
     busy = true;
     try {
       const workspace = await createWorkspace(name.trim());
-      showToast(`Created ${workspace.name}`);
+      showToast(t('Created {name}', { name: workspace.name }));
       await goto('/dashboard');
     } catch (err) {
       formError = toSentence(err instanceof Error ? err.message : String(err));
@@ -44,15 +45,15 @@
 </script>
 
 <svelte:head>
-  <title>{first ? 'Create your first workspace' : 'New workspace'} · CRM</title>
+  <title>{first ? t('Create your first workspace') : t('New workspace')} · CRM</title>
 </svelte:head>
 
 <div class="new-workspace animate-in">
-  <h1 class="page-title">{first ? 'Create your first workspace' : 'New workspace'}</h1>
+  <h1 class="page-title">{first ? t('Create your first workspace') : t('New workspace')}</h1>
   <p class="page-lede">
     {first
-      ? 'A workspace holds the contacts, companies, and deals your team shares. You will be its owner.'
-      : 'You will be its owner, and you can switch between workspaces from the top bar.'}
+      ? t('A workspace holds the contacts, companies, and deals your team shares. You will be its owner.')
+      : t('You will be its owner, and you can switch between workspaces from the top bar.')}
   </p>
 
   {#if formError}
@@ -62,16 +63,16 @@
   <form class="section-card section-card-body" novalidate onsubmit={submit}>
     <Field
       id="workspace-name"
-      label="Workspace name"
+      label={t('Workspace name')}
       autocomplete="organization"
       required
-      hint="Usually your company or team name."
+      hint={t('Usually your company or team name.')}
       bind:value={name}
       {error}
     />
     <div class="actions">
       {#if !first}
-        <a class="btn btn-secondary" href="/dashboard">Cancel</a>
+        <a class="btn btn-secondary" href="/dashboard">{t('Cancel')}</a>
       {/if}
       <button class="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>
         {busy ? 'Creating…' : 'Create workspace'}

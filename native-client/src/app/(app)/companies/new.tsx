@@ -9,6 +9,7 @@ import { recordsChanged } from '../../../lib/records/changes';
 import { useLeaveOnWorkspaceSwitch } from '../../../lib/records/hooks';
 import { session } from '../../../services';
 import { useTheme } from '../../../theme';
+import { t } from '../../../i18n';
 
 const companies = recordsApi(session.api, 'companies');
 
@@ -34,11 +35,11 @@ export default function NewCompany() {
   }
 
   return (
-    <ScreenFrame backLabel="Companies" backHref="/companies">
+    <ScreenFrame backLabel={t('Companies')} backHref="/companies">
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        New company
+        {t('New company')}
       </Text>
-      <CompanyForm submitLabel="Add company" busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
+      <CompanyForm submitLabel={t('Add company')} busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
     </ScreenFrame>
   );
 }

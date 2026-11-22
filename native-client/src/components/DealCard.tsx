@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import type { Deal } from '../lib/deals/board';
 import { formatMoney } from '../lib/deals/money';
 import { radius, useTheme } from '../theme';
+import { t } from '../i18n';
 
 type Props = { deal: Deal; busy: boolean; onMove: () => void };
 
@@ -24,8 +25,8 @@ export function DealCard({ deal, busy, onMove }: Props) {
         {value ? <Text style={{ color: theme.text, fontWeight: '600' }}>{value}</Text> : null}
         {deal.expected_close_date ? <Text style={{ color: theme.text2, fontSize: 13 }}>Closes {deal.expected_close_date}</Text> : null}
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Move ${deal.title}`} disabled={busy} hitSlop={8} onPress={onMove} style={styles.move}>
-        <Text style={{ color: theme.accentText, fontWeight: '600' }}>Move</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Move {name}', { name: deal.title })} disabled={busy} hitSlop={8} onPress={onMove} style={styles.move}>
+        <Text style={{ color: theme.accentText, fontWeight: '600' }}>{t('Move')}</Text>
       </Pressable>
     </View>
   );

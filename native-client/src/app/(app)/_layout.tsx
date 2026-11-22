@@ -5,6 +5,7 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { useStore } from '../../lib/store';
 import { session, workspaces } from '../../services';
 import { useTheme } from '../../theme';
+import { t } from '../../i18n';
 
 export default function AppLayout() {
   const theme = useTheme();
@@ -27,7 +28,7 @@ export default function AppLayout() {
   if (status !== 'ready') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: theme.bg }}>
-        <ActivityIndicator accessibilityLabel="Loading your workspaces" />
+        <ActivityIndicator accessibilityLabel={t('Loading your workspaces')} />
       </View>
     );
   }

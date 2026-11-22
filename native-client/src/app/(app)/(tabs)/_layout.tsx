@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useTheme } from '../../../theme';
+import { t } from '../../../i18n';
 
 export default function TabsLayout() {
   const theme = useTheme();
@@ -15,10 +16,10 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 14, fontWeight: '600', paddingVertical: 10 }
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="contacts" options={{ title: 'Contacts' }} />
-      <Tabs.Screen name="companies" options={{ title: 'Companies' }} />
-      <Tabs.Screen name="pipeline" options={{ title: 'Pipeline' }} />
+      <Tabs.Screen name="index" options={{ title: t('Home') }} />
+      <Tabs.Screen name="contacts" options={{ title: t('Contacts') }} />
+      <Tabs.Screen name="companies" options={{ title: t('Companies') }} />
+      <Tabs.Screen name="pipeline" options={{ title: t('Pipeline') }} />
     </Tabs>
   );
 }
