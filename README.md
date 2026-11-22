@@ -509,4 +509,4 @@ The English text is the key: `t('Sign in')` is English as it stands, and the Spa
 
 ## Recording a sale that is already closed
 
-New deal has a **Status** field: *In progress* (the default) or *Won*. The API starts every new deal in an open stage, so choosing Won creates the deal and then moves it to the pipeline's won stage. If the move fails, the deal still exists in its first stage and the app says so, so it can be moved from its page. Lost deals are recorded by moving a deal to Lost, which asks for the reason.
+New deal has a **Status** field: *Won* (the default, since the CRM is used to record sales already made) or *In progress*. The API starts every new deal in an open stage, so Won creates the deal and then moves it to the pipeline's won stage. If the move fails, the deal still exists in its first stage and the app says so, so it can be moved from its page. Lost deals are recorded by moving a deal to Lost, which asks for the reason.

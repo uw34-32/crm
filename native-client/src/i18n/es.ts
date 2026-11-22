@@ -232,7 +232,7 @@ export const es: Record<string, string> = {
   Closed: 'Cerrado',
   'Loading the deal': 'Cargando el deal',
   'In progress': 'En curso',
-  'Choose Won to record a sale that is already closed.': 'Elige Ganado para registrar una venta que ya se cerró.',
+  'Won records a sale that is already closed. In progress keeps the deal open on the board.': 'Ganado registra una venta que ya se cerró. En curso deja el deal abierto en el tablero.',
   'This pipeline has no won stage.': 'Este pipeline no tiene etapa de ganados.',
   'Added, but it could not be marked as won. Move it to Won from here.': 'Se añadió, pero no se pudo marcar como ganado. Muévelo a Ganado desde aquí.',
   Move: 'Mover',

@@ -46,7 +46,7 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
   const [valueTouched, setValueTouched] = useState(false);
   const [value, setValue] = useState(initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '');
   const [pipelineId, setPipelineId] = useState(initial.pipeline_id ?? choices[0]?.id ?? '');
-  const [status, setStatus] = useState<'open' | 'won'>('open');
+  const [status, setStatus] = useState<'open' | 'won'>('won');
   const [date, setDate] = useState(initial.expected_close_date ?? '');
   const [owner, setOwner] = useState(initial.owner_id ?? '');
   const [company, setCompany] = useState<Choice | null>(initial.company ?? null);
@@ -96,7 +96,7 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
           onChange={setStatus}
         />
       ) : null}
-      {creating ? <Text style={{ color: theme.text2 }}>{t('Choose Won to record a sale that is already closed.')}</Text> : null}
+      {creating ? <Text style={{ color: theme.text2 }}>{t('Won records a sale that is already closed. In progress keeps the deal open on the board.')}</Text> : null}
       {errors.pipeline_id ? <ErrorNotice message={errors.pipeline_id} /> : null}
       <Field ref={dateInput} label={t('Expected close date')} value={date} onChangeText={setDate} error={errors.expected_close_date} placeholder="2027-03-14" autoCapitalize="none" autoCorrect={false} returnKeyType="done" />
       <RecordPicker kind="companies" workspaceId={workspaceId} value={company} onChange={setCompany} />

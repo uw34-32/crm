@@ -37,7 +37,7 @@
       currency: initial.currency ?? 'USD',
       value: initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '',
       pipeline_id: initial.pipeline_id ?? pipelines[0]?.id ?? '',
-      status: 'open',
+      status: 'won',
       expected_close_date: initial.expected_close_date ?? '',
       owner_id: initial.owner_id ?? ''
     }))
@@ -94,7 +94,7 @@
           <option value="open">{t('In progress')}</option>
           <option value="won">{nameOf('Won')}</option>
         </select>
-        <p class="form-hint" id="deal-status-hint">{t('Choose Won to record a sale that is already closed.')}</p>
+        <p class="form-hint" id="deal-status-hint">{t('Won records a sale that is already closed. In progress keeps the deal open on the board.')}</p>
       </div>
     </div>
   {/if}
