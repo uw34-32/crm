@@ -7,7 +7,7 @@
   import DealForm from '$lib/components/DealForm.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import { dealCreateBody } from '$lib/deals/fields.js';
-  import { markWon } from '$lib/deals/won.js';
+  import { markWon, wonStageId } from '$lib/deals/won.js';
   import { toSentence } from '$lib/forms.js';
   import { loadMembers } from '$lib/members.svelte.js';
   import { isMissing } from '$lib/records/load.js';
@@ -39,11 +39,13 @@
     busy = true;
     formError = '';
     try {
+      // A sale to be closed needs a won stage, so find it first and create nothing if there is none.
+      const wonId = draft.status === 'won' ? await wonStageId(pipelinesApi(api), workspaceId, draft.pipeline_id ?? '') : '';
       const deal = /** @type {{ id: string, title: string }} */ (await deals.create(workspaceId, dealCreateBody(draft)));
-      if (draft.status === 'won') {
+      if (wonId) {
         // The API starts a deal in an open stage; the sale is closed by moving it.
         try {
-          await markWon(deals, pipelinesApi(api), workspaceId, deal.id, draft.pipeline_id ?? '');
+          await markWon(deals, workspaceId, deal.id, wonId);
           showToast(t('Added {name} as won', { name: deal.title }));
         } catch (err) {
           showToast(`${t('Added {name}, but it could not be marked as won. Move it to Won from its page.', { name: deal.title })} ${toSentence(err instanceof Error ? err.message : String(err))}`, 6000);

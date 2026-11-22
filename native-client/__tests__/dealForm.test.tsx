@@ -89,3 +89,27 @@ describe('the extra fields', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dress', pipeline_id: 'p1', status: 'won' }));
   });
 });
+
+describe('the date follows the status', () => {
+  const dateInput = () => screen.getByLabelText('Expected close date');
+  const creating = (onSubmit = jest.fn()) => render(<DealForm workspaceId="w1" creating pipelines={[{ id: 'p1', name: 'Sales' }]} submitLabel="Record sale" busy={false} error="" onSubmit={onSubmit} onCancel={() => undefined} />);
+
+  it('is blank for an open deal and today again for a won one, until it is typed', async () => {
+    await creating();
+    const today = dateInput().props.value;
+    await fireEvent.press(screen.getByRole('radio', { name: 'In progress' }));
+    expect(dateInput().props.value).toBe('');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Won' }));
+    expect(dateInput().props.value).toBe(today);
+    await fireEvent.changeText(dateInput(), '2027-01-05');
+    await fireEvent.press(screen.getByRole('radio', { name: 'In progress' }));
+    expect(dateInput().props.value).toBe('2027-01-05');
+  });
+
+  it('opens the extra fields when the pipeline is the problem', async () => {
+    await render(<DealForm workspaceId="w1" creating pipelines={[]} submitLabel="Record sale" busy={false} error="" onSubmit={() => undefined} onCancel={() => undefined} />);
+    await fireEvent.changeText(screen.getByLabelText('Title'), 'Dress');
+    await fireEvent.press(screen.getByRole('button', { name: 'Record sale' }));
+    expect(screen.getByRole('button', { name: 'Fewer details' })).toBeTruthy();
+  });
+});

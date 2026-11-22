@@ -121,6 +121,7 @@ export default function Pipeline() {
         renderItem={({ item }) => <DealCard deal={item} busy={Boolean(state.busy[item.id])} onMove={() => setMoving(item.id)} />}
       />
       {/* Recording a sale is what this tab is for, so its button stays in reach however far the list is scrolled. */}
+      {state.status === 'ready' && state.pipeline ? (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('Record sale')}
@@ -129,6 +130,7 @@ export default function Pipeline() {
       >
         <Text style={styles.recordLabel}>+ {t('Record sale')}</Text>
       </Pressable>
+      ) : null}
       {movingDeal ? (
         <MoveDealSheet
           deal={movingDeal}

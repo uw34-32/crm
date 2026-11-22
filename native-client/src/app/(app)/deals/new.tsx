@@ -6,7 +6,9 @@ import { DealForm } from '../../../components/DealForm';
 import { ErrorNotice } from '../../../components/ErrorNotice';
 import { ScreenFrame } from '../../../components/ScreenFrame';
 import { dealCreateBody, type DealDraft } from '../../../lib/deals/fields';
-import { markWon } from '../../../lib/deals/won';
+import { markWon, wonStageId } from '../../../lib/deals/won';
+import { setPendingNotice } from '../../../lib/records/notice';
+import { toSentence } from '../../../lib/forms';
 import { recordsChanged } from '../../../lib/records/changes';
 import { useWorkspaceId } from '../../../lib/records/hooks';
 import { isMissing } from '../../../lib/records/load';
@@ -47,17 +49,15 @@ export default function NewDeal() {
     setBusy(true);
     setError('');
     try {
+      // A sale to be closed needs a won stage, so find it first and create nothing if there is none.
+      const wonId = draft.status === 'won' ? await wonStageId(pipelines, workspaceId, draft.pipeline_id ?? '') : '';
       const deal = await deals.create(workspaceId, dealCreateBody(draft));
-      if (draft.status === 'won') {
-        // The API starts a deal in an open stage; the sale is closed by moving it.
-        const marked = await markWon(deals, pipelines, workspaceId, deal.id, draft.pipeline_id ?? '').then(
-          () => true,
-          () => false
+      if (wonId) {
+        // The API starts a deal in an open stage; the sale is closed by moving it. The deal exists
+        // either way, so a failed move is explained on the deal's own page, once.
+        await markWon(deals, workspaceId, deal.id, wonId).catch((err: unknown) =>
+          setPendingNotice(`${t('Added, but it could not be marked as won. Move it to Won from here.')} ${toSentence(err instanceof Error ? err.message : String(err))}`)
         );
-        recordsChanged();
-        // The deal exists either way; its page says when the move to Won did not happen.
-        router.replace(marked ? `/deals/${deal.id}` : `/deals/${deal.id}?notice=not-won`);
-        return;
       }
       recordsChanged();
       router.replace(`/deals/${deal.id}`);

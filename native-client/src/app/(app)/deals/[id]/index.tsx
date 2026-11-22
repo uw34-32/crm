@@ -18,6 +18,7 @@ import { useMembers } from '../../../../lib/members';
 import { recordsChanged } from '../../../../lib/records/changes';
 import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/hooks';
 import { isMissing } from '../../../../lib/records/load';
+import { takePendingNotice } from '../../../../lib/records/notice';
 import { memberName } from '../../../../lib/activities/timeline';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
@@ -37,7 +38,9 @@ const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { date
 export default function DealDetail() {
   useLocale();
   const theme = useTheme();
-  const { id, notice } = useLocalSearchParams<{ id: string; notice?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  // Why a deal that was just added could not be closed, shown once.
+  const [addNotice] = useState(takePendingNotice);
   useLeaveOnWorkspaceSwitch('/pipeline');
   const [gone, setGone] = useState(false);
   const { state, workspaceId, reload } = useRecord(deals.get, id, { paused: gone });
@@ -147,7 +150,7 @@ export default function DealDetail() {
             {deal.owner_id ? <DetailRow label={t('Owner')} value={memberName(members, deal.owner_id)} /> : null}
             {deal.expected_close_date ? <DetailRow label={t('Expected close')} value={deal.expected_close_date} /> : null}
             {moveError ? <ErrorNotice message={moveError} /> : null}
-            {notice === 'not-won' && deal?.status === 'open' ? <ErrorNotice message={t('Added, but it could not be marked as won. Move it to Won from here.')} /> : null}
+            {addNotice && deal?.status === 'open' ? <ErrorNotice message={addNotice} /> : null}
             <Button label={moveBusy ? t('Moving…') : t('Move to another stage')} variant="secondary" busy={moveBusy} disabled={!pipeline} onPress={() => setMoving(true)} />
           </DetailCard>
           <ActivityTimeline workspaceId={workspaceId} link={{ deal_id: deal.id }} />

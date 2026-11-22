@@ -51,7 +51,13 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
   const [details, setDetails] = useState(false);
   const showDetails = !creating || details;
   const [status, setStatus] = useState<'open' | 'won'>('won');
+  // The date is the day the sale was made, so it only suits a won deal: an open one has no date until one is typed.
+  function changeStatus(next: 'open' | 'won') {
+    setStatus(next);
+    if (!dateTouched) setDate(next === 'won' ? dayKey(new Date()) : '');
+  }
   // A new deal records a sale made today unless the date is changed; an edited one keeps its own.
+  const [dateTouched, setDateTouched] = useState(false);
   const [date, setDate] = useState(initial.expected_close_date ?? (creating ? dayKey(new Date()) : ''));
   const [owner, setOwner] = useState(initial.owner_id ?? '');
   const [company, setCompany] = useState<Choice | null>(initial.company ?? null);
@@ -81,6 +87,8 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
     };
     const found = validateDeal(creating ? draft : { ...draft, pipeline_id: pipelineId || 'existing' });
     setErrors(found);
+    // The pipeline sits under More details, so an error on it opens them.
+    if (found.pipeline_id) setDetails(true);
     if (Object.keys(found).length === 0) onSubmit(draft);
   }
 
@@ -95,12 +103,12 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
           label={t('Status')}
           value={status}
           options={[{ value: 'open', label: t('In progress') }, { value: 'won', label: nameOf('Won') }]}
-          onChange={setStatus}
+          onChange={changeStatus}
         />
       ) : null}
       {creating ? <Text style={{ color: theme.text2 }}>{t('Won records a sale that is already closed. In progress keeps the deal open on the board.')}</Text> : null}
       {errors.pipeline_id ? <ErrorNotice message={errors.pipeline_id} /> : null}
-      <Field ref={dateInput} label={t('Expected close date')} value={date} onChangeText={setDate} error={errors.expected_close_date} placeholder="2027-03-14" autoCapitalize="none" autoCorrect={false} returnKeyType="done" />
+      <Field ref={dateInput} label={t('Expected close date')} value={date} onChangeText={(text) => { setDateTouched(true); setDate(text); }} error={errors.expected_close_date} placeholder="2027-03-14" autoCapitalize="none" autoCorrect={false} returnKeyType="done" />
       {creating ? (
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: details }} onPress={() => setDetails((open) => !open)} hitSlop={8}>
           <Text style={{ color: theme.accentText, fontSize: 16 }}>{details ? t('Fewer details') : t('More details')}</Text>

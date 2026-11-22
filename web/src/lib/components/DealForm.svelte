@@ -51,12 +51,18 @@
   /** @type {HTMLElement | null} */
   let notice = $state(null);
   // A new deal asks only what recording a sale needs; the rest opens on request, or when it holds an error.
+  let dateTouched = false;
   let details = $state(false);
   const showDetails = $derived(!creating || details);
 
   $effect(() => {
     if (formError) tick().then(() => notice?.focus());
   });
+
+  // The date is the day the sale was made, so it only suits a won deal: an open one has no date until one is typed.
+  function changeStatus() {
+    if (!dateTouched) draft.expected_close_date = draft.status === 'won' ? dayKey(new Date()) : '';
+  }
 
   /** @param {SubmitEvent} event */
   async function submit(event) {
@@ -80,14 +86,14 @@
 <form class="section-card section-card-body" novalidate onsubmit={submit}>
   <Field id="deal-title" label={t('Title')} required bind:value={draft.title} error={errors.title} />
   <div class="row money">
-    <Field id="deal-value" label={t('Value')} hint={creating ? undefined : t('In the currency\'s main unit, such as 1250.50.')} bind:value={draft.value} error={errors.value} />
-    <Field id="deal-currency" label={t('Currency')} autocomplete="off" hint={creating ? undefined : t('Three letters, such as EUR.')} bind:value={draft.currency} error={errors.currency} />
+    <Field id="deal-value" label={t('Value')} hint={creating && !errors.value ? undefined : t('In the currency\'s main unit, such as 1250.50.')} bind:value={draft.value} error={errors.value} />
+    <Field id="deal-currency" label={t('Currency')} autocomplete="off" hint={creating && !errors.currency ? undefined : t('Three letters, such as EUR.')} bind:value={draft.currency} error={errors.currency} />
   </div>
   {#if creating}
     <div class="row">
       <div class="form-group">
         <label class="form-label" for="deal-status">{t('Status')}</label>
-        <select id="deal-status" class="select" bind:value={draft.status} aria-describedby="deal-status-hint">
+        <select id="deal-status" class="select" bind:value={draft.status} onchange={changeStatus} aria-describedby="deal-status-hint">
           <option value="open">{t('In progress')}</option>
           <option value="won">{nameOf('Won')}</option>
         </select>
@@ -102,6 +108,7 @@
       class="input"
       type="date"
       bind:value={draft.expected_close_date}
+      oninput={() => (dateTouched = true)}
       min="1900-01-01"
       max="2200-12-31"
       aria-invalid={errors.expected_close_date ? 'true' : undefined}
