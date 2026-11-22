@@ -100,6 +100,9 @@
 
   /** @type {{ deal: Deal, preset: { stageId: string, before: string | null } | null } | null} */
   let moving = $state(null);
+  // On a phone one stage shows at a time, chosen from the chips above the board.
+  let stageId = $state('');
+  const shownId = $derived(board.columns.find((c) => c.stage.id === stageId)?.stage.id ?? board.columns[0]?.stage.id ?? '');
 
   /** @param {{ stageId: string, before: string | null, lostReason: string }} target */
   function moveFromDialog({ stageId, before, lostReason }) {
@@ -176,6 +179,15 @@
     {#if board.truncated}
       <p class="load-error" role="status">{t('This pipeline has more open deals than the board shows. Close or move some to see the rest.')}</p>
     {/if}
+    <div class="stage-chips" role="tablist" aria-label={t('Stages of {name}', { name: nameOf(board.pipeline.name) })}>
+      {#each board.columns as column (column.stage.id)}
+        {@const total = totalOf(column)}
+        <button type="button" role="tab" class="stage-chip" aria-selected={column.stage.id === shownId} onclick={() => (stageId = column.stage.id)}>
+          <span>{nameOf(column.stage.name)} · {column.deals.length}{column.hasMore ? '+' : ''}</span>
+          {#if total}<span class="chip-total">{total}</span>{/if}
+        </button>
+      {/each}
+    </div>
     <div class="board" role="list" aria-label={t('Stages of {name}', { name: nameOf(board.pipeline.name) })}>
       {#each board.columns as column (column.stage.id)}
         {@const kind = closedKind(column)}
@@ -184,6 +196,7 @@
           class="column"
           class:over={over?.stageId === column.stage.id}
           class:closed={kind !== null}
+          class:not-shown={column.stage.id !== shownId}
           role="listitem"
           aria-labelledby="stage-{column.stage.id}"
           ondragover={(event) => dragOverColumn(event, column)}
@@ -245,6 +258,64 @@
 {/if}
 
 <style>
+  .stage-chips {
+    display: none;
+  }
+
+  /* On a phone the stages are chips and one column fills the width, as in the app. */
+  @media (max-width: 639px) {
+    .stage-chips {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .stage-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      min-height: 44px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    .stage-chip[aria-selected='true'] {
+      background: var(--accent-strong, var(--accent));
+      border-color: var(--accent-strong, var(--accent));
+      color: #fff;
+    }
+    .chip-total {
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+    .board {
+      display: block;
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+    }
+    .board .column {
+      flex: none;
+      max-height: none;
+      width: 100%;
+      min-height: 0;
+    }
+    .board .column.not-shown {
+      display: none;
+    }
+    .board .column-header {
+      display: none;
+    }
+  }
+
   .heading {
     display: flex;
     align-items: center;
