@@ -3,7 +3,7 @@
 // leaves them out. Checks mirror the API's limits and run on submit.
 
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { toSentence } from '../lib/forms';
 import { dayKey } from '../lib/activities/timeline';
 import { validateDeal, type DealDraft } from '../lib/deals/fields';
@@ -47,6 +47,9 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
   const [valueTouched, setValueTouched] = useState(false);
   const [value, setValue] = useState(initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '');
   const [pipelineId, setPipelineId] = useState(initial.pipeline_id ?? choices[0]?.id ?? '');
+  // A new deal asks only what recording a sale needs; the rest opens on request.
+  const [details, setDetails] = useState(false);
+  const showDetails = !creating || details;
   const [status, setStatus] = useState<'open' | 'won'>('won');
   // A new deal records a sale made today unless the date is changed; an edited one keeps its own.
   const [date, setDate] = useState(initial.expected_close_date ?? (creating ? dayKey(new Date()) : ''));
@@ -87,9 +90,6 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
       <Field label={t('Title')} value={title} onChangeText={setTitle} error={errors.title} returnKeyType="next" onSubmitEditing={() => valueInput.current?.focus()} />
       <Field ref={valueInput} label={t('Value')} value={value} onChangeText={(text) => { setValueTouched(true); setValue(text); }} error={errors.value} keyboardType="decimal-pad" placeholder={t('1250.50')} returnKeyType="next" onSubmitEditing={() => currencyInput.current?.focus()} />
       <Field ref={currencyInput} label={t('Currency')} value={currency} onChangeText={changeCurrency} error={errors.currency} autoCapitalize="characters" autoCorrect={false} maxLength={3} returnKeyType="next" onSubmitEditing={() => dateInput.current?.focus()} />
-      {creating && choices.length > 1 ? (
-        <OptionChips label={t('Pipeline')} value={pipelineId} options={choices.map((p) => ({ value: p.id, label: nameOf(p.name) }))} onChange={setPipelineId} />
-      ) : null}
       {creating ? (
         <OptionChips
           label={t('Status')}
@@ -101,9 +101,21 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
       {creating ? <Text style={{ color: theme.text2 }}>{t('Won records a sale that is already closed. In progress keeps the deal open on the board.')}</Text> : null}
       {errors.pipeline_id ? <ErrorNotice message={errors.pipeline_id} /> : null}
       <Field ref={dateInput} label={t('Expected close date')} value={date} onChangeText={setDate} error={errors.expected_close_date} placeholder="2027-03-14" autoCapitalize="none" autoCorrect={false} returnKeyType="done" />
-      <RecordPicker kind="companies" workspaceId={workspaceId} value={company} onChange={setCompany} />
-      <RecordPicker kind="contacts" workspaceId={workspaceId} value={contact} onChange={setContact} />
-      <MemberPicker label={t('Owner')} workspaceId={workspaceId} value={owner} onChange={setOwner} />
+      {creating ? (
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: details }} onPress={() => setDetails((open) => !open)} hitSlop={8}>
+          <Text style={{ color: theme.accentText, fontSize: 16 }}>{details ? t('Fewer details') : t('More details')}</Text>
+        </Pressable>
+      ) : null}
+      {showDetails ? (
+        <>
+        {creating && choices.length > 1 ? (
+          <OptionChips label={t('Pipeline')} value={pipelineId} options={choices.map((p) => ({ value: p.id, label: nameOf(p.name) }))} onChange={setPipelineId} />
+        ) : null}
+        <RecordPicker kind="companies" workspaceId={workspaceId} value={company} onChange={setCompany} />
+        <RecordPicker kind="contacts" workspaceId={workspaceId} value={contact} onChange={setContact} />
+        <MemberPicker label={t('Owner')} workspaceId={workspaceId} value={owner} onChange={setOwner} />
+        </>
+      ) : null}
       <Button label={submitLabel} busy={busy} onPress={submit} />
       <Button label={t('Cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
     </View>

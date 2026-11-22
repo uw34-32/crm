@@ -143,7 +143,7 @@
       {/if}
     </div>
     <a class="btn btn-primary" href="/deals/new{board.pipeline ? `?pipeline=${encodeURIComponent(board.pipeline.id)}` : ''}">
-      <Plus size={18} aria-hidden="true" /> {t('New deal')}
+      <Plus size={18} aria-hidden="true" /> {t('Record sale')}
     </a>
   </div>
 

@@ -71,14 +71,14 @@ export default function NewDeal() {
   return (
     <ScreenFrame backLabel={t('Pipeline')} backHref="/pipeline">
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        {t('New deal')}
+        {t('Record a sale')}
       </Text>
       {loadError ? (
         <ErrorNotice message={loadError} onRetry={() => setAttempt((n) => n + 1)} />
       ) : !choices || !workspaceId ? (
         <ActivityIndicator accessibilityLabel={t('Loading the pipelines')} />
       ) : (
-        <DealForm workspaceId={workspaceId} pipelines={choices} creating submitLabel={t('Add deal')} busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
+        <DealForm workspaceId={workspaceId} pipelines={choices} creating submitLabel={t('Record sale')} busy={busy} error={error} onSubmit={(d) => void create(d)} onCancel={() => router.back()} />
       )}
     </ScreenFrame>
   );

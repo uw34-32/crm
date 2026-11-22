@@ -62,7 +62,6 @@ export default function Pipeline() {
           }}
         />
       ) : null}
-      <Button label={t('New deal')} onPress={() => router.push(state.pipeline ? `/deals/new?pipeline=${state.pipeline.id}` : '/deals/new')} />
       {state.status === 'ready' && columns.length > 0 ? (
         <View style={styles.stages} accessibilityRole="tablist">
           {columns.map((c) => {
@@ -121,6 +120,15 @@ export default function Pipeline() {
         ListFooterComponent={footer ?? undefined}
         renderItem={({ item }) => <DealCard deal={item} busy={Boolean(state.busy[item.id])} onMove={() => setMoving(item.id)} />}
       />
+      {/* Recording a sale is what this tab is for, so its button stays in reach however far the list is scrolled. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('Record sale')}
+        onPress={() => router.push(state.pipeline ? `/deals/new?pipeline=${state.pipeline.id}` : '/deals/new')}
+        style={[styles.record, { backgroundColor: theme.accentStrong }]}
+      >
+        <Text style={styles.recordLabel}>+ {t('Record sale')}</Text>
+      </Pressable>
       {movingDeal ? (
         <MoveDealSheet
           deal={movingDeal}
@@ -137,7 +145,10 @@ export default function Pipeline() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 10, maxWidth: 640, width: '100%', alignSelf: 'center' },
+  // Room under the list for the fixed button.
+  content: { padding: 16, paddingBottom: 96, gap: 10, maxWidth: 640, width: '100%', alignSelf: 'center' },
+  record: { position: 'absolute', right: 16, bottom: 16, minHeight: 48, paddingHorizontal: 20, borderRadius: 24, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  recordLabel: { color: '#fff', fontSize: 16, fontWeight: '700' },
   header: { gap: 12, marginBottom: 6 },
   title: { fontSize: 28, fontWeight: '700' },
   stages: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

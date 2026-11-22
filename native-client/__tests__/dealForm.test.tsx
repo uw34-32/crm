@@ -59,3 +59,33 @@ describe('the expected close date', () => {
     expect(screen.getByLabelText('Expected close date').props.value).toBe('');
   });
 });
+
+describe('the extra fields', () => {
+  const creating = () => render(<DealForm workspaceId="w1" creating pipelines={[{ id: 'p1', name: 'Sales' }, { id: 'p2', name: 'Other' }]} submitLabel="Record sale" busy={false} error="" onSubmit={() => undefined} onCancel={() => undefined} />);
+
+  it('stay behind "More details" on a new deal, so recording a sale fits one screen', async () => {
+    await creating();
+    expect(screen.queryByText('Owner')).toBeNull();
+    expect(screen.queryByText('Pipeline')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Record sale' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'More details' }));
+    expect(screen.getByText('Pipeline')).toBeTruthy();
+    expect(screen.getByText('Owner')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Fewer details' }));
+    expect(screen.queryByText('Owner')).toBeNull();
+  });
+
+  it('are all shown when editing a deal', async () => {
+    await setup();
+    expect(screen.getByText('Owner')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'More details' })).toBeNull();
+  });
+
+  it('still go with the deal when they were never opened', async () => {
+    const onSubmit = jest.fn();
+    await render(<DealForm workspaceId="w1" creating pipelines={[{ id: 'p1', name: 'Sales' }]} submitLabel="Record sale" busy={false} error="" onSubmit={onSubmit} onCancel={() => undefined} />);
+    await fireEvent.changeText(screen.getByLabelText('Title'), 'Dress');
+    await fireEvent.press(screen.getByRole('button', { name: 'Record sale' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dress', pipeline_id: 'p1', status: 'won' }));
+  });
+});

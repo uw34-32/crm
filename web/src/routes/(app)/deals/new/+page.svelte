@@ -63,19 +63,19 @@
 </script>
 
 <svelte:head>
-  <title>{t('New deal · CRM')}</title>
+  <title>{t('Record a sale · CRM')}</title>
 </svelte:head>
 
 <div class="animate-in">
-  <h1 class="page-title">{t('New deal')}</h1>
-  <p class="page-lede">{t('A title and a currency are enough to start. To record a sale that is already closed, set the status to Won.')}</p>
+  <h1 class="page-title">{t('Record a sale')}</h1>
+  <p class="page-lede">{t('A title and a value are enough. It is recorded as a sale already made; choose In progress to follow it on the board.')}</p>
   {#await pipelines}
     <div aria-busy="true">
       <p class="sr-only" role="status">{t('Loading the pipelines')}</p>
       <span class="skeleton" style="display:block;height:520px;border-radius:var(--radius)"></span>
     </div>
   {:then list}
-    <DealForm creating {workspaceId} pipelines={list} submitLabel={t('Add deal')} busyLabel={t('Adding…')} {busy} {formError} {cancelHref} onsubmit={create} />
+    <DealForm creating {workspaceId} pipelines={list} submitLabel={t('Record sale')} busyLabel={t('Adding…')} {busy} {formError} {cancelHref} onsubmit={create} />
   {:catch err}
     <ErrorNotice message={err instanceof Error ? err.message : String(err)} onretry={() => location.reload()} />
   {/await}
