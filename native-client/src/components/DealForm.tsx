@@ -5,6 +5,7 @@
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { toSentence } from '../lib/forms';
+import { dayKey } from '../lib/activities/timeline';
 import { validateDeal, type DealDraft } from '../lib/deals/fields';
 import { majorText } from '../lib/deals/money';
 import { Button } from './Button';
@@ -47,7 +48,8 @@ export function DealForm({ workspaceId, initial = {}, pipelines: choices = [], c
   const [value, setValue] = useState(initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '');
   const [pipelineId, setPipelineId] = useState(initial.pipeline_id ?? choices[0]?.id ?? '');
   const [status, setStatus] = useState<'open' | 'won'>('won');
-  const [date, setDate] = useState(initial.expected_close_date ?? '');
+  // A new deal records a sale made today unless the date is changed; an edited one keeps its own.
+  const [date, setDate] = useState(initial.expected_close_date ?? (creating ? dayKey(new Date()) : ''));
   const [owner, setOwner] = useState(initial.owner_id ?? '');
   const [company, setCompany] = useState<Choice | null>(initial.company ?? null);
   const [contact, setContact] = useState<Choice | null>(initial.contact ?? null);

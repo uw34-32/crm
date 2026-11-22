@@ -9,6 +9,7 @@
   import ContactPicker from '$lib/components/ContactPicker.svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
   import Field from '$lib/components/Field.svelte';
+  import { dayKey } from '$lib/activities/timeline.js';
   import { validateDeal } from '$lib/deals/fields.js';
   import { majorText } from '$lib/deals/money.js';
   import { members } from '$lib/members.svelte.js';
@@ -38,7 +39,8 @@
       value: initial.value_minor ? majorText(initial.value_minor, initial.currency ?? 'USD') : '',
       pipeline_id: initial.pipeline_id ?? pipelines[0]?.id ?? '',
       status: 'won',
-      expected_close_date: initial.expected_close_date ?? '',
+      // A new deal records a sale made today unless the date is changed; an edited one keeps its own.
+      expected_close_date: initial.expected_close_date ?? (creating ? dayKey(new Date()) : ''),
       owner_id: initial.owner_id ?? ''
     }))
   );

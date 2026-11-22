@@ -35,3 +35,27 @@ describe('deal form', () => {
     expect(screen.queryByText(/no decimals/)).toBeNull();
   });
 });
+
+describe('the expected close date', () => {
+  const today = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  it('starts as today on a new deal, and the status as won', async () => {
+    await render(<DealForm workspaceId="w1" creating pipelines={[{ id: 'p1', name: 'Sales' }]} submitLabel="Save" busy={false} error="" onSubmit={() => undefined} onCancel={() => undefined} />);
+    expect(screen.getByLabelText('Expected close date').props.value).toBe(today());
+    expect(screen.getByRole('radio', { name: 'Won', checked: true })).toBeTruthy();
+  });
+
+  it("keeps an edited deal's own date", async () => {
+    await render(<DealForm workspaceId="w1" initial={{ ...initial, expected_close_date: '2027-03-14' }} submitLabel="Save" busy={false} error="" onSubmit={() => undefined} onCancel={() => undefined} />);
+    expect(screen.getByLabelText('Expected close date').props.value).toBe('2027-03-14');
+  });
+
+  it('stays blank on an edited deal that had no date', async () => {
+    await render(<DealForm workspaceId="w1" initial={initial} submitLabel="Save" busy={false} error="" onSubmit={() => undefined} onCancel={() => undefined} />);
+    expect(screen.getByLabelText('Expected close date').props.value).toBe('');
+  });
+});
