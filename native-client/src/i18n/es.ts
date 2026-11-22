@@ -13,6 +13,7 @@ export const es: Record<string, string> = {
   'this contact': 'este contacto',
   'this company': 'esta empresa',
   'this deal': 'este deal',
+  'this record': 'este registro',
   'the stage': 'la etapa',
   'the new stage': 'la nueva etapa',
   'the workspace': 'el workspace',
@@ -64,7 +65,7 @@ export const es: Record<string, string> = {
   'Enter a title.': 'Escribe un título.',
   'Enter a three-letter currency code such as EUR.': 'Escribe un código de moneda de tres letras, como EUR.',
   'Choose a pipeline.': 'Elige un pipeline.',
-  'Enter an amount such as 1250 or 1250.50.': 'Escribe un importe como 1250 o 1250.50.',
+  'Enter an amount such as 1250 or 1250.50.': 'Escribe un importe como 1250 o 1250,50.',
   'This amount is larger than the API accepts.': 'Este importe es mayor de lo que acepta la API.',
   'Enter a name for the workspace.': 'Escribe un nombre para el workspace.',
   'Say why the deal was lost.': 'Indica por qué se perdió el deal.',
@@ -218,7 +219,7 @@ export const es: Record<string, string> = {
   'Deal not found': 'Deal no encontrado',
   Title: 'Título',
   Value: 'Valor',
-  'In the currency\'s main unit, such as 1250.50.': 'En la unidad principal de la moneda, por ejemplo 1250.50.',
+  'In the currency\'s main unit, such as 1250.50.': 'En la unidad principal de la moneda, por ejemplo 1250,50.',
   Currency: 'Moneda',
   'Three letters, such as EUR.': 'Tres letras, como EUR.',
   'Starting stage': 'Etapa inicial',
@@ -321,6 +322,7 @@ export const es: Record<string, string> = {
   "company_id not found": "empresa no encontrada",
 
   // Only in the native app
+  '1250.50': '1250,50',
   "Only the first open deals are shown.": "Solo se muestran los primeros deals abiertos.",
   "This workspace has no pipeline yet.": "Este workspace aún no tiene pipeline.",
   "No domain, phone, industry, or address yet.": "Aún no hay dominio, teléfono, sector ni dirección.",

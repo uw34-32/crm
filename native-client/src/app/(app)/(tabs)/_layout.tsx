@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router';
 import { useTheme } from '../../../theme';
-import { t } from '../../../i18n';
+import { t, useLocale } from '../../../i18n';
 
 export default function TabsLayout() {
+  useLocale();
   const theme = useTheme();
   return (
     <Tabs

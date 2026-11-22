@@ -68,5 +68,8 @@ export function t(text, params) {
  */
 export const nameOf = (name) => (i18n.locale === 'es' ? (esDefaultNames[name] ?? name) : name);
 
+/** Whether amounts are typed with a comma for the decimals, as in 1250,50. */
+export const decimalComma = () => i18n.locale === 'es';
+
 /** The language the dates and numbers are written in. */
 export const dateLocale = () => (i18n.locale === 'es' ? 'es' : 'en-US');

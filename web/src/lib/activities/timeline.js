@@ -1,14 +1,13 @@
 // How a timeline reads: activities grouped by the local day they were created, the
 // state of a task against its due time, and who may change an activity.
 
+import { t } from '../i18n.svelte.js';
+
 /**
  * @typedef {{ id: string, kind: 'note' | 'call' | 'meeting' | 'task', created_at?: string, due_at?: string | null, completed_at?: string | null, author_id?: string | null, [key: string]: any }} Activity
  * @typedef {{ key: string, label: string, items: Activity[] }} DayGroup
  * @typedef {'none' | 'open' | 'completed' | 'overdue' | 'today' | 'upcoming'} DueState
  */
-
-import { t } from '../i18n.svelte.js';
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The local calendar day of a date, as YYYY-MM-DD. @param {Date} date */

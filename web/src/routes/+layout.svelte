@@ -1,20 +1,20 @@
 <script>
-  import { t } from '$lib/i18n.svelte.js';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { onMount } from 'svelte';
   import ErrorNotice from '$lib/components/ErrorNotice.svelte';
-  import { startLocale } from '$lib/i18n.svelte.js';
+  import { startLocale, t } from '$lib/i18n.svelte.js';
   import { restoreSession, session, signOut } from '$lib/session.svelte.js';
   import { toast } from '$lib/toast.svelte.js';
 
   let { children } = $props();
 
   // Restore the previous visit's session before any route decides where to go.
-  onMount(() => {
-    startLocale();
-    void restoreSession();
-  });
+  onMount(restoreSession);
+
+  // The page is never prerendered, so this runs in the browser before the first paint and
+  // the screens never show a language that is then replaced.
+  startLocale();
 </script>
 
 <ModeWatcher themeColors={{ dark: '#000000', light: '#f2f2f7' }} />

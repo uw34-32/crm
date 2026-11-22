@@ -11,12 +11,13 @@ import { useWorkspaceId } from '../../../lib/records/hooks';
 import { isMissing } from '../../../lib/records/load';
 import { session } from '../../../services';
 import { useTheme } from '../../../theme';
-import { t } from '../../../i18n';
+import { t, useLocale } from '../../../i18n';
 
 const deals = dealsApi(session.api);
 const pipelines = pipelinesApi(session.api);
 
 export default function NewDeal() {
+  useLocale();
   const theme = useTheme();
   const workspaceId = useWorkspaceId();
   // The board links here with the pipeline it showed, so the deal starts there.

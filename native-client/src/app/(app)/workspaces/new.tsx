@@ -9,9 +9,10 @@ import { checkName, toSentence } from '../../../lib/forms';
 import { useStore } from '../../../lib/store';
 import { workspaces } from '../../../services';
 import { useTheme } from '../../../theme';
-import { t } from '../../../i18n';
+import { t, useLocale } from '../../../i18n';
 
 export default function NewWorkspace() {
+  useLocale();
   const theme = useTheme();
   const { list } = useStore(workspaces.state);
   const [name, setName] = useState('');

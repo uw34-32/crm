@@ -27,7 +27,13 @@
 
   const activities = activitiesApi(api);
   const kindLabel = (/** @type {string} */ k) => ({ note: t('Note'), call: t('Call'), meeting: t('Meeting'), task: t('Task') })[/** @type {'note'} */ (k)];
-  const kindName = (/** @type {string | undefined} */ k) => (k ? kindLabel(k).toLowerCase() : t('activity'));
+  // Whole texts per kind: a sentence built from a translated word breaks gender and case.
+  const addedText = (/** @type {string} */ k) => ({ note: t('Note added'), call: t('Call added'), meeting: t('Meeting added'), task: t('Task added') })[/** @type {'note'} */ (k)];
+  const addText = (/** @type {string} */ k) => ({ note: t('Add note'), call: t('Add call'), meeting: t('Add meeting'), task: t('Add task') })[/** @type {'note'} */ (k)];
+  const deleteTitle = (/** @type {string | undefined} */ k) =>
+    ({ note: t('Delete this note?'), call: t('Delete this call?'), meeting: t('Delete this meeting?'), task: t('Delete this task?') })[/** @type {'note'} */ (k ?? '')] ?? t('Delete this activity?');
+  const deleteLabel = (/** @type {string | undefined} */ k) =>
+    ({ note: t('Delete note'), call: t('Delete call'), meeting: t('Delete meeting'), task: t('Delete task') })[/** @type {'note'} */ (k ?? '')] ?? t('Delete activity');
   const kindInfo = {
     note: { icon: NotebookPen },
     call: { icon: Phone },
@@ -78,7 +84,7 @@
       const created = await activities.create(workspaceId, activityCreateBody({ kind, ...draft }, link));
       list.items = [/** @type {any} */ (created), ...list.items];
       draft = blank();
-      showToast(t('{kind} added', { kind: kindLabel(kind) }));
+      showToast(addedText(kind));
     } catch (err) {
       addError = toSentence(err instanceof Error ? err.message : String(err));
     } finally {
@@ -236,7 +242,7 @@
     <div class="form-actions">
       <button class="btn btn-primary" type="submit" disabled={adding} aria-busy={adding}>
         <Plus size={18} aria-hidden="true" />
-        {adding ? t('Adding…') : t('Add {kind}', { kind: kindName(kind) })}
+        {adding ? t('Adding…') : addText(kind)}
       </button>
     </div>
   </form>
@@ -250,7 +256,7 @@
       <span class="skeleton skeleton-line" style="display:block;width:45%"></span>
     </div>
   {:else if list.items.length === 0}
-    <p class="section-card-body muted">{t('Nothing logged for {name} yet. Add a note after your next call.', { name: subjectName })}</p>
+    <p class="section-card-body muted">{t('Nothing logged for {name} yet. Add a note after your next call.', { name: subjectName || t('this record') })}</p>
   {:else}
     {#each groups as group (group.key)}
       <div class="day">
@@ -351,9 +357,9 @@
 
 <ConfirmDialog
   open={deleting !== null}
-  title={t('Delete this {kind}?', { kind: kindName(deleting?.kind) })}
+  title={deleteTitle(deleting?.kind)}
   message={t('It leaves the timeline for everyone in the workspace.')}
-  confirmLabel={t('Delete {kind}', { kind: kindName(deleting?.kind) })}
+  confirmLabel={deleteLabel(deleting?.kind)}
   busyLabel={t('Deleting…')}
   busy={deleteBusy}
   error={deleteError}

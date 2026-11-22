@@ -73,6 +73,9 @@ export function t(text: string, params?: Record<string, string | number>): strin
  */
 export const nameOf = (name: string): string => (localeStore.get().locale === 'es' ? (esDefaultNames[name] ?? name) : name);
 
+/** Whether amounts are typed with a comma for the decimals, as in 1250,50. */
+export const decimalComma = (): boolean => localeStore.get().locale === 'es';
+
 /** The language dates and numbers are written in. */
 export const dateLocale = (): string => (localeStore.get().locale === 'es' ? 'es' : 'en-US');
 

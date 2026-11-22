@@ -8,9 +8,10 @@ import { Field, type TextInputHandle } from '../../components/Field';
 import { checkEmail, checkName, checkPassword, toSentence } from '../../lib/forms';
 import { session } from '../../services';
 import { useTheme } from '../../theme';
-import { t } from '../../i18n';
+import { t, useLocale } from '../../i18n';
 
 export default function Register() {
+  useLocale();
   const theme = useTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

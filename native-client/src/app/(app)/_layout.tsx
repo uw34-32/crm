@@ -5,9 +5,10 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { useStore } from '../../lib/store';
 import { session, workspaces } from '../../services';
 import { useTheme } from '../../theme';
-import { t } from '../../i18n';
+import { t, useLocale } from '../../i18n';
 
 export default function AppLayout() {
+  useLocale();
   const theme = useTheme();
   const { user } = useStore(session.state);
   const { status, error, list, userId } = useStore(workspaces.state);

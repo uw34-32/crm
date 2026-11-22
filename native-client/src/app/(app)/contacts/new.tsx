@@ -13,12 +13,13 @@ import { useLeaveOnWorkspaceSwitch } from '../../../lib/records/hooks';
 import { isMissing } from '../../../lib/records/load';
 import { session } from '../../../services';
 import { useTheme } from '../../../theme';
-import { t } from '../../../i18n';
+import { t, useLocale } from '../../../i18n';
 
 const contacts = recordsApi(session.api, 'contacts');
 const companies = recordsApi(session.api, 'companies');
 
 export default function NewContact() {
+  useLocale();
   const theme = useTheme();
   const workspaceId = useLeaveOnWorkspaceSwitch('/contacts');
   // Arriving from a company's screen links the new contact to it.

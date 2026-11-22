@@ -2,6 +2,8 @@
 // refresh of an expired token shared by every request that needs it, in this tab and
 // across the browser's other tabs.
 
+import { t } from '../i18n.svelte.js';
+
 /**
  * @typedef {{ token: string, refresh_token: string, user?: unknown }} Session
  * @typedef {{
@@ -15,9 +17,6 @@
  */
 
 /** The Web Locks name every tab of this origin rotates the refresh token under. */
-
-import { t } from '../i18n.svelte.js';
-
 export const REFRESH_LOCK = 'crm.refresh';
 
 const msgNetwork = () => t('Cannot reach the server. Check your connection and try again.');

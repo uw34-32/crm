@@ -12,11 +12,12 @@ import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/ho
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
-import { t } from '../../../../i18n';
+import { t, useLocale } from '../../../../i18n';
 
 const companies = recordsApi(session.api, 'companies');
 
 export default function EditCompany() {
+  useLocale();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/companies');

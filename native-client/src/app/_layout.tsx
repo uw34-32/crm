@@ -14,8 +14,9 @@ export default function RootLayout() {
   const theme = useTheme();
   const { user, ready, restoreError } = useStore(session.state);
 
-  // The language shapes every screen, so a change of it remounts them.
-  const locale = useLocale();
+  // Every screen follows the language: each one calls useLocale, so a change re-renders them
+  // in place and keeps the navigation and what was typed.
+  useLocale();
 
   // Trade the saved refresh token for a session once, when the app starts, and read the language.
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      <Stack key={locale} screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!user}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>

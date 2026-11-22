@@ -9,9 +9,10 @@ import { checkEmail, checkPassword, toSentence } from '../../lib/forms';
 import { useStore } from '../../lib/store';
 import { session } from '../../services';
 import { useTheme } from '../../theme';
-import { t } from '../../i18n';
+import { t, useLocale } from '../../i18n';
 
 export default function Login() {
+  useLocale();
   const theme = useTheme();
   const { ended } = useStore(session.state);
   const [email, setEmail] = useState('');

@@ -1,9 +1,9 @@
 // Deal values travel as whole minor units with a currency code, the way the API
 // stores them. These turn them into text for the screen and back from a form.
 
-/** The API's upper bound on value_minor. */
-import { t } from '../../i18n';
+import { decimalComma, t } from '../../i18n';
 
+/** The API's upper bound on value_minor. */
 export const MAX_MINOR = 999_999_999_999_999;
 
 const AMOUNT_SHAPE = /^\d+(\.\d+)?$/;
@@ -37,12 +37,22 @@ export function formatMoney(minor: number, currency: string, locale?: string, { 
   return `${currency} ${plain.format(amount)}`.trim();
 }
 
+/** The amount text with only digits and one dot for the decimals, or as typed when it has no such shape. */
+function normalizeAmount(text: string): string {
+  const spaced = text.replaceAll(/\s/g, '');
+  if (!decimalComma()) return spaced.replaceAll(',', '');
+  if (spaced.includes(',')) return spaced.replaceAll('.', '').replace(',', '.');
+  return /^\d{1,3}(\.\d{3})+$/.test(spaced) ? spaced.replaceAll('.', '') : spaced;
+}
+
 /**
- * The amount a person typed, as minor units. Commas are grouping and a dot the
- * decimal point, as in 1,250.50; blank means no value yet.
+ * The amount a person typed, as minor units; blank means no value yet. In English commas
+ * are grouping and a dot the decimal point, as in 1,250.50. In Spanish a comma is the
+ * decimal point and dots group, as in 1.250,50, and a dot that is not followed by exactly
+ * three digits is still read as the decimal point, so 1250.50 means what it says.
  */
 export function parseMoney(text: string, currency: string): { minor: number; error?: undefined } | { error: string; minor?: undefined } {
-  const cleaned = text.replaceAll(',', '').replaceAll(/\s/g, '');
+  const cleaned = normalizeAmount(text);
   if (!cleaned) return { minor: 0 };
   if (!AMOUNT_SHAPE.test(cleaned)) return { error: t('Enter an amount such as 1250 or 1250.50.') };
   const digits = minorUnitDigits(currency);
@@ -63,5 +73,5 @@ export function majorText(minor: number, currency: string) {
   const digits = minorUnitDigits(currency);
   const text = String(minor).padStart(digits + 1, '0');
   if (digits === 0) return text;
-  return `${text.slice(0, -digits)}.${text.slice(-digits)}`;
+  return `${text.slice(0, -digits)}${decimalComma() ? ',' : '.'}${text.slice(-digits)}`;
 }

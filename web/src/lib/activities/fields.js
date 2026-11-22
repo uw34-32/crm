@@ -2,14 +2,13 @@
 // bodies. A due time lives in the form as the local text of a datetime-local field and
 // travels as an instant. Only a task has a due time and an assignee.
 
+import { t } from '../i18n.svelte.js';
+
 /**
  * @typedef {'note' | 'call' | 'meeting' | 'task'} ActivityKind
  * @typedef {{ kind: ActivityKind, subject?: string, body?: string, due_at?: string, assignee_id?: string | null }} ActivityDraft
  * @typedef {{ deal_id: string } | { contact_id: string } | { company_id: string }} ActivityLink
  */
-
-import { t } from '../i18n.svelte.js';
-
 export const ACTIVITY_KINDS = /** @type {const} */ (['note', 'call', 'meeting', 'task']);
 export const ACTIVITY_LIMITS = { subject: 200, body: 10000 };
 

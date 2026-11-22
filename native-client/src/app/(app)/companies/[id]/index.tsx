@@ -21,13 +21,14 @@ import { isMissing } from '../../../../lib/records/load';
 import { isPersonOf, loadPeople } from '../../../../lib/records/people';
 import { session } from '../../../../services';
 import { radius, useTheme } from '../../../../theme';
-import { dateLocale, t } from '../../../../i18n';
+import { dateLocale, t, useLocale } from '../../../../i18n';
 
 const companies = recordsApi(session.api, 'companies');
 const contactsApi = recordsApi(session.api, 'contacts');
 const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function CompanyDetail() {
+  useLocale();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/companies');

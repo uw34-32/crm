@@ -1,4 +1,5 @@
 import { ApiError, createClient, REFRESH_TIMEOUT_MS, type Tokens } from '../src/api/client';
+import { setLocale } from '../src/i18n';
 import { BASE, reply } from '../test-support/helpers';
 
 function setup(fetch: jest.Mock, refresh: string | null = 'refresh-1') {
@@ -147,5 +148,27 @@ describe('refresh edge cases', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('messages in Spanish', () => {
+  afterEach(async () => {
+    await setLocale('en');
+  });
+
+  it('translates the messages of the API it knows and passes the others through', async () => {
+    await setLocale('es');
+    const failing = async (status: number, error: string): Promise<ApiError> => {
+      try {
+        await setup(jest.fn(async () => reply(status, { error }))).client.request('/a');
+      } catch (err) {
+        return err as ApiError;
+      }
+      throw new Error('the request did not fail');
+    };
+    expect((await failing(400, 'invalid email or password')).message).toBe('correo o contraseña no válidos');
+    expect((await failing(404, 'workspace not found')).message).toBe('workspace no encontrado');
+    expect((await failing(400, 'something new the server says')).message).toBe('something new the server says');
+    expect((await failing(500, 'boom')).message).toMatch(/servidor/);
   });
 });

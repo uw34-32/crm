@@ -17,12 +17,13 @@ import { useLeaveOnWorkspaceSwitch, useRecord } from '../../../../lib/records/ho
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
-import { dateLocale, t } from '../../../../i18n';
+import { dateLocale, t, useLocale } from '../../../../i18n';
 
 const contacts = recordsApi(session.api, 'contacts');
 const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function ContactDetail() {
+  useLocale();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/contacts');

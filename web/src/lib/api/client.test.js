@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../i18n.svelte.js';
 import { ApiError, createClient, REFRESH_TIMEOUT_MS } from './client.js';
 import { createTokenStore, REFRESH_TOKEN_KEY } from './tokens.js';
 
@@ -273,6 +274,18 @@ describe('error messages', () => {
     const { client } = clientFor(api, memoryTokens());
     return client.request('/workspaces').catch((e) => e);
   }
+
+  describe('in Spanish', () => {
+    afterEach(() => setLocale('en', false));
+
+    it('translates the messages of the API it knows and passes the others through', async () => {
+      setLocale('es', false);
+      expect((await failureOf(() => reply(400, { error: 'invalid email or password' }))).message).toBe('correo o contraseña no válidos');
+      expect((await failureOf(() => reply(404, { error: 'workspace not found' }))).message).toBe('workspace no encontrado');
+      expect((await failureOf(() => reply(400, { error: 'something new the server says' }))).message).toBe('something new the server says');
+      expect((await failureOf(() => reply(500, { error: 'boom' }))).message).toMatch(/servidor/);
+    });
+  });
 
   it('says how long to wait after a 429', async () => {
     const failure = await failureOf(() => reply(429, { error: 'too many requests' }, { 'Retry-After': '30' }));

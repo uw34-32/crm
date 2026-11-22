@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { act, renderHook } from '@testing-library/react-native';
 import { es } from '../src/i18n/es';
-import { dateLocale, nameOf, pickLocale, roleLabel, setLocale, t } from '../src/i18n';
+import { dateLocale, nameOf, pickLocale, roleLabel, setLocale, t, useLocale } from '../src/i18n';
 
 afterEach(async () => {
   await setLocale('en');
@@ -44,6 +45,24 @@ describe('translating', () => {
 
   it('leaves a mark with no value as it is', () => {
     expect(t('Added {name}', {})).toBe('Added {name}');
+  });
+});
+
+describe('following a change of language', () => {
+  it('re-renders a component that uses the hook, without remounting it', async () => {
+    let renders = 0;
+    const { result } = await renderHook(() => {
+      renders++;
+      useLocale();
+      return t('Sign in');
+    });
+    expect(result.current).toBe('Sign in');
+    const before = renders;
+    await act(async () => {
+      await setLocale('es');
+    });
+    expect(result.current).toBe('Iniciar sesión');
+    expect(renders).toBeGreaterThan(before);
   });
 });
 

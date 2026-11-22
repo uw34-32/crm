@@ -12,11 +12,12 @@ import { useRecord, useWorkspaceId } from '../../../../lib/records/hooks';
 import { isMissing } from '../../../../lib/records/load';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
-import { t } from '../../../../i18n';
+import { t, useLocale } from '../../../../i18n';
 
 const deals = dealsApi(session.api);
 
 export default function EditDeal() {
+  useLocale();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, reload } = useRecord(deals.get, id);

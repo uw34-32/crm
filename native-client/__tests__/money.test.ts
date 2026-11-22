@@ -1,3 +1,4 @@
+import { setLocale } from '../src/i18n';
 import { formatMoney, majorText, minorUnitDigits, parseMoney } from '../src/lib/deals/money';
 
 describe('minor unit digits', () => {
@@ -63,5 +64,41 @@ describe('the amount a form starts from', () => {
     expect(majorText(50, 'EUR')).toBe('0.50');
     expect(majorText(5000, 'JPY')).toBe('5000');
     expect(majorText(0, 'EUR')).toBe('');
+  });
+});
+
+describe('amounts typed in Spanish', () => {
+  beforeEach(() => setLocale('es'));
+  afterEach(() => setLocale('en'));
+
+  it('reads a comma as the decimal point and dots as grouping', () => {
+    expect(parseMoney('1250,50', 'EUR')).toEqual({ minor: 125050 });
+    expect(parseMoney('1.250,50', 'EUR')).toEqual({ minor: 125050 });
+    expect(parseMoney('1.250', 'EUR')).toEqual({ minor: 125000 });
+    expect(parseMoney('0,5', 'USD')).toEqual({ minor: 50 });
+  });
+
+  it('still reads a dot that is not followed by three digits as the decimal point', () => {
+    expect(parseMoney('1250.50', 'EUR')).toEqual({ minor: 125050 });
+    expect(parseMoney('1250', 'EUR')).toEqual({ minor: 125000 });
+  });
+
+  it('refuses too many decimals and shapes it cannot read', () => {
+    expect(parseMoney('1250,505', 'EUR').error).toMatch(/máximo 2 decimales/);
+    expect(parseMoney('1,250,50', 'EUR').error).toBeTruthy();
+    expect(parseMoney('12a', 'EUR').error).toBeTruthy();
+  });
+
+  it('writes the amount for a form with a comma, and it reads back as the same amount', () => {
+    expect(majorText(125050, 'EUR')).toBe('1250,50');
+    expect(parseMoney(majorText(125050, 'EUR'), 'EUR')).toEqual({ minor: 125050 });
+    expect(majorText(125500, 'KWD')).toBe('125,500');
+    expect(parseMoney(majorText(125500, 'KWD'), 'KWD')).toEqual({ minor: 125500 });
+  });
+
+  it('is unchanged in English, where the comma groups', async () => {
+    await setLocale('en');
+    expect(parseMoney('1,250.50', 'EUR')).toEqual({ minor: 125050 });
+    expect(majorText(125050, 'EUR')).toBe('1250.50');
   });
 });

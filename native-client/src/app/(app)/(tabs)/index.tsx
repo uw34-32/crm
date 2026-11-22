@@ -5,10 +5,11 @@ import { WorkspaceSwitcher } from '../../../components/WorkspaceSwitcher';
 import { useStore } from '../../../lib/store';
 import { session, workspaces } from '../../../services';
 import { useTheme } from '../../../theme';
-import { t } from '../../../i18n';
+import { t, useLocale } from '../../../i18n';
 import { LanguageSwitcher } from '../../../components/LanguageSwitcher';
 
 export default function Home() {
+  useLocale();
   const theme = useTheme();
   const { user } = useStore(session.state);
   const { current } = useStore(workspaces.state);

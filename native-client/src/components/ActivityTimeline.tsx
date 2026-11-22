@@ -58,7 +58,7 @@ export function ActivityTimeline({ workspaceId, link }: Props) {
 
   const refresh = () => pager.load('', { quiet: true });
   const now = new Date();
-  const groups = groupByDay(list.items, now);
+  const groups = groupByDay(list.items, now, dateLocale());
   const actor = { userId: user?.id ?? '', role: current?.role ?? 'member' };
 
   async function save(draft: ActivityDraft) {

@@ -16,11 +16,12 @@ import { changes } from '../../../lib/records/changes';
 import { useStore } from '../../../lib/store';
 import { session } from '../../../services';
 import { radius, useTheme } from '../../../theme';
-import { nameOf, t } from '../../../i18n';
+import { nameOf, t, useLocale } from '../../../i18n';
 
 const board = createBoard({ pipelines: pipelinesApi(session.api), deals: dealsApi(session.api) });
 
 export default function Pipeline() {
+  useLocale();
   const theme = useTheme();
   const workspaceId = useWorkspaceId();
   const { version } = useStore(changes);

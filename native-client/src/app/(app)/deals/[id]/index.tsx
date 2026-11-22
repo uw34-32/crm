@@ -21,13 +21,14 @@ import { isMissing } from '../../../../lib/records/load';
 import { memberName } from '../../../../lib/activities/timeline';
 import { session } from '../../../../services';
 import { useTheme } from '../../../../theme';
-import { dateLocale, nameOf, t } from '../../../../i18n';
+import { dateLocale, nameOf, t, useLocale } from '../../../../i18n';
 
 const deals = dealsApi(session.api);
 const pipelines = pipelinesApi(session.api);
 const formatDate = (value: Date) => new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium' }).format(value);
 
 export default function DealDetail() {
+  useLocale();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   useLeaveOnWorkspaceSwitch('/pipeline');
