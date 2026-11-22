@@ -50,6 +50,9 @@
   let errors = $state({});
   /** @type {HTMLElement | null} */
   let notice = $state(null);
+  // A new deal asks only what recording a sale needs; the rest opens on request, or when it holds an error.
+  let details = $state(false);
+  const showDetails = $derived(!creating || details);
 
   $effect(() => {
     if (formError) tick().then(() => notice?.focus());
@@ -61,6 +64,7 @@
     errors = validateDeal(draft);
     const first = order.find((field) => errors[field]);
     if (first) {
+      if (first === 'pipeline_id') details = true;
       await tick();
       document.getElementById(`deal-${first}`)?.focus();
       return;
@@ -75,21 +79,12 @@
 
 <form class="section-card section-card-body" novalidate onsubmit={submit}>
   <Field id="deal-title" label={t('Title')} required bind:value={draft.title} error={errors.title} />
-  <div class="row">
-    <Field id="deal-value" label={t('Value')} hint={t('In the currency\'s main unit, such as 1250.50.')} bind:value={draft.value} error={errors.value} />
-    <Field id="deal-currency" label={t('Currency')} autocomplete="off" hint={t('Three letters, such as EUR.')} bind:value={draft.currency} error={errors.currency} />
+  <div class="row money">
+    <Field id="deal-value" label={t('Value')} hint={creating ? undefined : t('In the currency\'s main unit, such as 1250.50.')} bind:value={draft.value} error={errors.value} />
+    <Field id="deal-currency" label={t('Currency')} autocomplete="off" hint={creating ? undefined : t('Three letters, such as EUR.')} bind:value={draft.currency} error={errors.currency} />
   </div>
   {#if creating}
     <div class="row">
-      <div class="form-group">
-        <label class="form-label" for="deal-pipeline_id">{t('Pipeline')}</label>
-        <select id="deal-pipeline_id" class="select" bind:value={draft.pipeline_id} aria-invalid={errors.pipeline_id ? 'true' : undefined}>
-          {#each pipelines as pipeline (pipeline.id)}
-            <option value={pipeline.id}>{nameOf(pipeline.name)}</option>
-          {/each}
-        </select>
-        {#if errors.pipeline_id}<p class="form-error">{errors.pipeline_id}</p>{/if}
-      </div>
       <div class="form-group">
         <label class="form-label" for="deal-status">{t('Status')}</label>
         <select id="deal-status" class="select" bind:value={draft.status} aria-describedby="deal-status-hint">
@@ -114,17 +109,37 @@
     />
     {#if errors.expected_close_date}<p class="form-error" id="deal-expected_close_date-error">{errors.expected_close_date}</p>{/if}
   </div>
-  <CompanyPicker id="deal-company" {workspaceId} bind:value={company} />
-  <ContactPicker id="deal-contact" {workspaceId} bind:value={contact} />
-  <div class="form-group">
-    <label class="form-label" for="deal-owner_id">{t('Owner')}</label>
-    <select id="deal-owner_id" class="select" bind:value={draft.owner_id}>
-      <option value="">{creating ? t('Me') : t('No owner')}</option>
-      {#each members.list as member (member.user_id)}
-        <option value={member.user_id}>{member.name || member.email}</option>
-      {/each}
-    </select>
-  </div>
+  {#if creating}
+    <button type="button" class="btn btn-ghost details-toggle" aria-expanded={details} aria-controls="deal-details" onclick={() => (details = !details)}>
+      {details ? t('Fewer details') : t('More details')}
+    </button>
+  {/if}
+  {#if showDetails}
+    <div id="deal-details">
+      {#if creating}
+        <div class="form-group">
+          <label class="form-label" for="deal-pipeline_id">{t('Pipeline')}</label>
+          <select id="deal-pipeline_id" class="select" bind:value={draft.pipeline_id} aria-invalid={errors.pipeline_id ? 'true' : undefined}>
+            {#each pipelines as pipeline (pipeline.id)}
+              <option value={pipeline.id}>{nameOf(pipeline.name)}</option>
+            {/each}
+          </select>
+          {#if errors.pipeline_id}<p class="form-error">{errors.pipeline_id}</p>{/if}
+        </div>
+      {/if}
+      <CompanyPicker id="deal-company" {workspaceId} bind:value={company} />
+      <ContactPicker id="deal-contact" {workspaceId} bind:value={contact} />
+      <div class="form-group">
+        <label class="form-label" for="deal-owner_id">{t('Owner')}</label>
+        <select id="deal-owner_id" class="select" bind:value={draft.owner_id}>
+          <option value="">{creating ? t('Me') : t('No owner')}</option>
+          {#each members.list as member (member.user_id)}
+            <option value={member.user_id}>{member.name || member.email}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
+  {/if}
   <div class="form-actions">
     <a class="btn btn-secondary" href={cancelHref}>{t('Cancel')}</a>
     <button class="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? busyLabel : submitLabel}</button>
@@ -132,6 +147,13 @@
 </form>
 
 <style>
+  /* The amount and its currency share a line, so recording a sale fits a phone screen. */
+  .row.money {
+    grid-template-columns: 2fr 1fr;
+  }
+  .details-toggle {
+    margin-bottom: 16px;
+  }
   .row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
